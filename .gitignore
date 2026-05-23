@@ -10,6 +10,9 @@ videos/*.mov
 videos/*.webm
 videos/*.avi
 !videos/.gitkeep
+# But include procedural benchmark videos for reproducible tests
+!videos/synthetic/
+!videos/synthetic/*.mp4
 .DS_Store
 *.log
 .pytest_cache/
