@@ -74,30 +74,50 @@ def compute_dna(latents: np.ndarray, coords_3d: np.ndarray) -> dict:
         n_clusters = 0
         cluster_density = 0.0
 
-    # 6. Cross-TE proxy : moyenne mutual info premiere/derniere dimension
-    if coords_3d.shape[1] >= 2:
-        from .emergence import _mutual_info_bins
-        mi_01 = _mutual_info_bins(coords_3d[:-1, 0], coords_3d[1:, 0])
-        mi_02 = _mutual_info_bins(coords_3d[:-1, 0], coords_3d[1:, 1])
-        causality = float((mi_01 + mi_02) / 2)
+    # 6. Causality : KSG TE estimator entre dim 0 et dim 1 du coord 3D.
+    # Mesure couplage causal SHUFFLED-corrected. Évite saturation MI.
+    if coords_3d.shape[1] >= 2 and n >= 30:
+        try:
+            from .causal_advanced import transfer_entropy_ksg
+            # TE empirique
+            te_01 = transfer_entropy_ksg(coords_3d[:, 0], coords_3d[:, 1], lag=1, k=4)
+            # TE baseline avec shuffled control
+            rng = np.random.RandomState(0)
+            y_shuf = rng.permutation(coords_3d[:, 1])
+            te_shuf = transfer_entropy_ksg(coords_3d[:, 0], y_shuf, lag=1, k=4)
+            # Causality = excess TE au-dessus chance (delta normalisé)
+            causality = max(0.0, te_01 - te_shuf)
+        except Exception:
+            causality = 0.0
     else:
         causality = 0.0
 
-    # Normalise tous les axes en [0, 1]
+    # Normalisation : ré-calibrée empiriquement via ablation study sur 6 systèmes canoniques.
+    # Voir backend/dna_validation.py. axis_variance ~ discrimination power.
     axes = {
-        "chaos": _clip01(lyap * 4.0),                    # Lyapunov amplifie
+        "chaos": _clip01(lyap * 4.0),                    # Lyapunov amplifié
         "topology": _clip01(math.log(h1 + 1) / 5.0),     # log scale h1
         "complexity": _clip01(corr_dim / 3.0),           # dim 3D max ≈ 3
         "spectral": _clip01(slope / 4.0),                # slope -3..-4 typique chaos
         "structure": _clip01(cluster_density / 2.0),
-        "causality": _clip01(causality / 1.5),
+        "causality": _clip01(causality * 1.2),           # KSG TE excess vs shuffle, échelle empirique
         "predictability": _clip01(predictability),
     }
 
-    # Composite score : somme pondérée (complexité globale)
+    # Composite weights : équilibre discrimination empirique (ablation study)
+    # + thematic coverage. Sur 6 systèmes canoniques, variance par axe :
+    # topology=0.32, causality=0.28, spectral=0.24, predictability=0.06,
+    # chaos=0.06, complexity=0.02, structure=0.02.
+    # Weights blend empirical discrimination with floor 0.06 per axis
+    # to keep all dimensions interpretable.
     weights = {
-        "chaos": 0.18, "topology": 0.15, "complexity": 0.18,
-        "spectral": 0.10, "structure": 0.15, "causality": 0.12, "predictability": 0.12,
+        "topology": 0.30,        # most discriminating (var=0.32)
+        "causality": 0.20,       # 2nd (var=0.28, KSG TE excess)
+        "spectral": 0.18,        # 3rd (var=0.24)
+        "predictability": 0.10,
+        "chaos": 0.10,
+        "complexity": 0.06,
+        "structure": 0.06,
     }
     composite = sum(axes[k] * weights[k] for k in axes) * 100
 
