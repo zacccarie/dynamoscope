@@ -1,0 +1,3126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DYNAMOSCOPE</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #e8e8e8;
+    --cyan: #00e5ff;
+    --magenta: #ff2dd4;
+    --amber: #ffb400;
+    --plasma: #00ff88;
+    --panel: rgba(8, 8, 12, 0.86);
+    --panel-solid: #07070b;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(0, 229, 255, 0.22);
+    --mono: "JetBrains Mono", "PP Neue Bit", "SF Mono", ui-monospace, monospace;
+    --display: "Chakra Petch", "Inter", system-ui, sans-serif;
+    --sidebar-l: 260px;
+    --sidebar-r: 320px;
+    --topbar-h: 56px;
+    --bottombar-h: 72px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; width: 100%; background: var(--bg); color: var(--fg); font-family: var(--display); overflow: hidden; }
+
+  /* ─── grid principal ───────────────────────────────────── */
+  body {
+    display: grid;
+    grid-template:
+      "top    top     top"    var(--topbar-h)
+      "left   center  right"  1fr
+      "bottom bottom  bottom" var(--bottombar-h)
+      / var(--sidebar-l) 1fr var(--sidebar-r);
+  }
+
+  #canvas { grid-area: center; width: 100%; height: 100%; display: block; }
+  .axis-overlay {
+    grid-area: center; z-index: 4; align-self: start; justify-self: start;
+    pointer-events: none; padding: 14px; margin: 0;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    color: rgba(255,255,255,0.45); display: flex; flex-direction: column; gap: 4px;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(6px); border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .axis-overlay .ax-line { display: flex; align-items: center; gap: 8px; }
+  .axis-overlay .swatch { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
+  .axis-overlay .lbl { color: var(--fg); font-weight: 600; }
+  .axis-overlay .desc { color: rgba(255,255,255,0.55); }
+  .grain { position: fixed; inset: 0; pointer-events: none; opacity: 0.035; z-index: 1;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"); }
+
+  /* ─── top bar ──────────────────────────────────────────── */
+  .topbar {
+    grid-area: top;
+    display: flex; align-items: center; gap: 24px;
+    padding: 0 20px;
+    background: var(--panel-solid);
+    border-bottom: 1px solid var(--border-strong);
+    z-index: 10;
+  }
+  .brand { display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; white-space: nowrap; }
+  .brand .logo { font-size: 13px; letter-spacing: 0.32em; color: var(--cyan); font-weight: 700; }
+  .brand .tag { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; color: rgba(255,255,255,0.4); white-space: nowrap; }
+  .topstats { display: flex; gap: 18px; flex: 1; align-items: center; font-family: var(--mono); font-size: 11px; }
+  .topstat { display: flex; gap: 6px; align-items: baseline; }
+  .topstat .k { color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.12em; font-size: 9px; }
+  .topstat .v { color: var(--plasma); }
+  #device { font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 0.15em; }
+
+  /* ─── sidebar partage ──────────────────────────────────── */
+  .sidebar {
+    background: var(--panel-solid);
+    overflow-y: auto;
+    z-index: 5;
+    border-right: 1px solid var(--border);
+  }
+  .sidebar.right { grid-area: right; border-right: none; border-left: 1px solid var(--border); }
+  .sidebar.left { grid-area: left; padding: 14px 16px 60px; }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.18); border-radius: 3px; }
+
+  /* ─── left sidebar : controls ──────────────────────────── */
+  .section { margin-bottom: 16px; }
+  .section-title { font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
+    color: rgba(255,255,255,0.4); text-transform: uppercase; margin-bottom: 8px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .field label { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.12em; }
+  select, input[type="number"] {
+    background: #000; color: var(--fg);
+    border: 1px solid var(--border-strong);
+    padding: 7px 9px; font-family: var(--mono); font-size: 11px; border-radius: 2px; outline: none; width: 100%;
+  }
+  select:focus, input:focus { border-color: var(--cyan); }
+  input[type="range"].param-slider { width: 100%; accent-color: var(--cyan); -webkit-appearance: none; appearance: none; height: 3px; background: rgba(255,255,255,0.12); border-radius: 2px; outline: none; }
+  input[type="range"].param-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); cursor: pointer; }
+  .slider-field { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline; margin-bottom: 8px; }
+  .slider-field label { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.12em; grid-column: 1; }
+  .slider-field .val { font-family: var(--mono); font-size: 10px; color: var(--plasma); justify-self: end; grid-column: 2; }
+  .slider-field input { grid-column: 1 / 3; }
+
+  button {
+    background: transparent; color: var(--cyan); border: 1px solid var(--cyan);
+    padding: 7px 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer; border-radius: 2px; transition: all 0.16s; width: 100%;
+  }
+  button:hover { background: var(--cyan); color: #000; box-shadow: 0 0 14px rgba(0,229,255,0.45); }
+  button.alt { color: var(--magenta); border-color: var(--magenta); }
+  button.alt:hover { background: var(--magenta); color: #000; box-shadow: 0 0 14px rgba(255,45,212,0.45); }
+  button.muted { color: rgba(255,255,255,0.65); border-color: rgba(255,255,255,0.2); }
+  button.muted:hover { color: #fff; border-color: var(--cyan); background: rgba(0,229,255,0.08); box-shadow: none; }
+  button:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  input[type="file"] { display: none; }
+
+  /* ─── player ───────────────────────────────────────────── */
+  .player { border: 1px solid var(--border); border-radius: 3px; overflow: hidden; background: #000; }
+  #playerHost { width: 100%; aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+  #playerHost .ph { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.16em; }
+  #playerImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .player-meta { display: flex; justify-content: space-between; padding: 5px 8px;
+    font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.45);
+    border-top: 1px solid var(--border); background: rgba(0,0,0,0.5); }
+  .player-meta .cur { color: var(--cyan); }
+  .player-meta .tot { color: var(--magenta); }
+  .play-controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
+  .play-controls button { padding: 5px 0; font-size: 12px; letter-spacing: 0; }
+
+  /* ─── bottom bar : scrubber ────────────────────────────── */
+  .bottombar {
+    grid-area: bottom;
+    background: var(--panel-solid);
+    border-top: 1px solid var(--border-strong);
+    padding: 12px 24px;
+    display: grid;
+    grid-template-columns: 240px 1fr 240px;
+    align-items: center;
+    gap: 24px;
+    z-index: 10;
+  }
+  .bottombar .left-info, .bottombar .right-info { display: flex; align-items: center; gap: 16px; font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); }
+  .bottombar .right-info { justify-content: flex-end; }
+  .bottombar .frame-counter { color: var(--cyan); font-size: 16px; font-weight: 700; }
+  .bottombar .frame-counter .sep { color: rgba(255,255,255,0.3); margin: 0 4px; }
+  .bottombar .frame-counter .tot { color: var(--magenta); }
+  .scrubber-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .scrubber-row { display: flex; align-items: center; gap: 10px; }
+  .color-legend { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.55); }
+  .color-legend .grad { height: 6px; flex: 1; border-radius: 2px; min-width: 80px; }
+  .color-legend .grad.time { background: linear-gradient(90deg, #00e5ff 0%, #ff2dd4 50%, #ffb400 100%); }
+  .color-legend .grad.velocity { background: linear-gradient(90deg, #19337c 0%, #19b3ff 25%, #34ff7c 50%, #ffb500 75%, #ff2200 100%); }
+  .color-legend .end { white-space: nowrap; }
+  .scrubber {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 4px; background: rgba(255,255,255,0.1);
+    border-radius: 2px; outline: none;
+  }
+  .scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 12px var(--cyan); cursor: pointer;
+  }
+  #status { font-family: var(--mono); font-size: 10px; color: var(--amber); min-width: 200px; }
+  .pulse { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+  /* ─── right sidebar : tabs + panels ────────────────────── */
+  .tabs {
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    background: #000; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 2;
+  }
+  .knn-cell { position: relative; cursor: pointer; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+  .knn-cell:hover { border-color: var(--cyan); box-shadow: 0 0 8px rgba(0,229,255,0.5); }
+  .knn-cell img { width: 100%; display: block; }
+  .knn-cell .meta { position: absolute; bottom: 0; left: 0; right: 0; padding: 2px 4px;
+    font-family: var(--mono); font-size: 8px; background: rgba(0,0,0,0.75); color: var(--plasma); }
+  .knn-cell .meta .idx { color: var(--cyan); }
+  .tab {
+    background: transparent; color: rgba(255,255,255,0.4); border: none; border-right: 1px solid var(--border);
+    padding: 12px 4px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; cursor: pointer;
+    text-transform: uppercase; transition: all 0.14s;
+    border-radius: 0;
+  }
+  .tab:last-child { border-right: none; }
+  .tab:hover { color: var(--cyan); background: rgba(0,229,255,0.05); box-shadow: none; }
+  .tab.active { color: var(--cyan); background: rgba(0,229,255,0.08); border-bottom: 2px solid var(--cyan); }
+  .tab-panel { padding: 16px 18px; display: none; }
+  .tab-panel.active { display: block; }
+  .tab-panel h2 { font-size: 11px; letter-spacing: 0.28em; color: var(--cyan); margin-bottom: 12px; }
+
+  /* ─── metrics grid commun ──────────────────────────────── */
+  .mgrid { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin-bottom: 12px; font-family: var(--mono); font-size: 11px; }
+  .mgrid .k { color: rgba(255,255,255,0.55); }
+  .mgrid .v { color: var(--plasma); text-align: right; }
+
+  /* ─── canvases analysis ────────────────────────────────── */
+  .analysis-canvas { display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: 1 / 1;
+    border: 1px solid var(--border); border-radius: 2px; margin: 8px 0; background: rgba(0,0,0,0.5); }
+  .panel-caption { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.35); text-align: center; letter-spacing: 0.14em; margin-top: 4px; }
+  .panel-actions { margin-top: 10px; }
+  .panel-actions button { font-size: 9px; padding: 6px 10px; }
+
+  /* ─── SINDy equations panel ────────────────────────────── */
+  .sindy-eq { padding: 4px 0; color: rgba(255,255,255,0.92); font-family: var(--mono); font-size: 11px; letter-spacing: 0.01em; }
+  .sindy-eq .lhs { color: var(--cyan); }
+  .sindy-eq .coef-pos { color: var(--plasma); }
+  .sindy-eq .coef-neg { color: var(--magenta); }
+  .sindy-eq .term { color: var(--amber); }
+  .sindy-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5); }
+  .sindy-meta b { color: var(--plasma); font-weight: 600; }
+
+  /* ─── entropy / emergence ladder bars ──────────────────── */
+  .bar-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-family: var(--mono); font-size: 9px; }
+  .bar-row .lbl { width: 28px; color: rgba(255,255,255,0.5); text-align: right; }
+  .bar-row .bar { height: 8px; background: linear-gradient(90deg, var(--cyan), var(--magenta));
+    border-radius: 1px; box-shadow: 0 0 6px var(--cyan); }
+  .bar-row .ebar { height: 7px; background: linear-gradient(90deg, var(--plasma), var(--cyan));
+    border-radius: 1px; box-shadow: 0 0 6px var(--plasma); }
+  .bar-row .val { color: var(--plasma); margin-left: auto; }
+
+  /* ─── history panel (modal-style overlay) ──────────────── */
+  .history-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 50;
+    display: none; align-items: center; justify-content: center; backdrop-filter: blur(6px);
+  }
+  .history-modal.open { display: flex; }
+  .history-modal .content {
+    width: 540px; max-height: 80vh; background: var(--panel-solid);
+    border: 1px solid var(--border-strong); border-radius: 4px; overflow-y: auto;
+    padding: 22px 26px;
+  }
+  .history-modal h2 { font-size: 13px; letter-spacing: 0.32em; color: var(--cyan); margin-bottom: 16px; }
+  .hist-row { padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; display: flex;
+    justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 11px; }
+  .hist-row:hover { background: rgba(0,229,255,0.05); padding-left: 6px; padding-right: 6px; }
+  .hist-row .lbl { color: rgba(255,255,255,0.85); }
+  .hist-row .meta { color: rgba(255,255,255,0.4); font-size: 9px; margin-top: 3px; }
+  .hist-row .del { color: rgba(255,80,120,0.6); cursor: pointer; padding: 0 10px; font-size: 14px; }
+  .hist-row .del:hover { color: #ff4080; }
+  .modal-close { position: absolute; top: 24px; right: 28px; background: transparent; border: none;
+    color: rgba(255,255,255,0.5); font-size: 18px; cursor: pointer; width: auto; padding: 4px 8px; }
+  .modal-close:hover { color: var(--magenta); box-shadow: none; background: transparent; }
+
+  /* responsive trim */
+  @media (max-width: 1400px) {
+    body { grid-template-columns: 240px 1fr 300px; }
+  }
+  @media (max-width: 1100px) {
+    body { grid-template-columns: 220px 1fr 280px; }
+    .brand .tag { display: none; }
+    .topstats { gap: 12px; font-size: 10px; }
+  }
+  @media (max-width: 900px) {
+    body { grid-template-columns: 200px 1fr 260px; }
+    .tab { font-size: 8px; padding: 10px 2px; letter-spacing: 0.08em; }
+    .topstats .topstat:nth-child(n+5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── TOP BAR ─────────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="brand">
+    <span class="logo">DYNAMOSCOPE</span>
+    <span class="tag">video → latent trajectory → emergence</span>
+  </div>
+  <div class="topstats">
+    <div class="topstat"><span class="k">source</span><span class="v" id="src">—</span></div>
+    <div class="topstat"><span class="k">encoder</span><span class="v" id="enc">—</span></div>
+    <div class="topstat"><span class="k">dim</span><span class="v" id="ldim">—</span></div>
+    <div class="topstat"><span class="k">points</span><span class="v" id="npts">—</span></div>
+    <div class="topstat"><span class="k">encode</span><span class="v" id="t_enc">—</span></div>
+    <div class="topstat"><span class="k">reduce</span><span class="v" id="t_red">—</span></div>
+  </div>
+  <div id="device">device · …</div>
+</div>
+
+<!-- ─── LEFT SIDEBAR ───────────────────────────────────────── -->
+<div class="sidebar left">
+  <div class="section">
+    <div class="section-title">video input</div>
+    <div class="field">
+      <label>encoder</label>
+      <select id="encoderSel">
+        <option value="resnet50">ResNet50 · 2048d · ImageNet supervised</option>
+        <option value="vit_b_16">ViT-B/16 · 768d · ImageNet supervised</option>
+        <option value="dinov2_vits14">DINOv2-S · 384d · self-supervised</option>
+        <option value="clip_vit_b32">CLIP ViT-B/32 · 512d · text-image</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>max frames</label>
+      <input id="maxFrames" type="number" value="150" min="30" max="500" step="10" />
+    </div>
+    <div class="field">
+      <label>reducer</label>
+      <select id="reducerSel">
+        <option value="umap">UMAP · non-linéaire topologique</option>
+        <option value="pca">PCA · linéaire isométrique</option>
+        <option value="isomap">Isomap · géodésique k-NN</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section" id="umapParamsSection">
+    <div class="section-title">embedding params</div>
+    <div class="slider-field">
+      <label>n_neighbors</label>
+      <span class="val" id="nnVal">15</span>
+      <input type="range" class="param-slider" id="paramNN" min="2" max="60" value="15" step="1" />
+    </div>
+    <div class="slider-field">
+      <label>min_dist</label>
+      <span class="val" id="mdVal">0.10</span>
+      <input type="range" class="param-slider" id="paramMD" min="0" max="100" value="10" step="1" />
+    </div>
+    <div class="slider-field">
+      <label>smoothing window</label>
+      <span class="val" id="smVal">0</span>
+      <input type="range" class="param-slider" id="paramSM" min="0" max="20" value="0" step="1" />
+    </div>
+    <div class="field">
+      <label>metric</label>
+      <select id="paramMetric">
+        <option value="cosine">cosine</option>
+        <option value="euclidean">euclidean</option>
+        <option value="manhattan">manhattan</option>
+        <option value="correlation">correlation</option>
+      </select>
+    </div>
+    <div style="font-size: 9px; color: rgba(255,255,255,0.4); line-height: 1.4; margin-top: 4px;">
+      n_neighbors petit ↑ détail local · grand ↑ structure globale. min_dist contrôle compacité cluster. smoothing = moyenne glissante temporelle post-projection (lisse jumps artefactuels).
+    </div>
+    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+      <div style="font-family: var(--mono); font-size: 9px; color: var(--plasma); letter-spacing: 0.16em; margin-bottom: 6px;">AUTO-TUNE</div>
+      <div class="field">
+        <label>objective</label>
+        <select id="autotuneObj">
+          <option value="composite">composite · faith + cont + spread</option>
+          <option value="faithfulness">faithfulness · k-NN preservation</option>
+          <option value="continuity">continuity · temporal smooth</option>
+          <option value="spread">spread · variance coverage</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>method</label>
+        <select id="autotuneMethod">
+          <option value="bayesian">Bayesian opt · GP-EI (faster convergence)</option>
+          <option value="random">random search · uniform</option>
+        </select>
+      </div>
+      <button id="autotuneBtn" style="color: var(--plasma); border-color: var(--plasma);">auto-tune · 20 trials</button>
+      <div id="autotuneResult" style="font-size: 9px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-top: 8px; display: none;"></div>
+    </div>
+    <label class="filebtn" style="display:block;">
+      <input type="file" id="fileInput" accept="video/*" />
+      <button onclick="document.getElementById('fileInput').click()">upload video</button>
+    </label>
+    <button id="liveBtn" style="margin-top:6px; color:#ff66cc; border-color:#ff66cc;">live · webcam ●</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">synthetic system</div>
+    <div class="field">
+      <label>type</label>
+      <select id="systemSel">
+        <option value="lorenz">Lorenz · chaotic 3D</option>
+        <option value="rossler">Rössler · funnel</option>
+        <option value="van_der_pol">Van der Pol · limit cycle</option>
+        <option value="henon">Hénon · discrete map</option>
+        <option value="logistic">Logistic · period-doubling</option>
+        <option value="double_pendulum">Double pendulum · Hamiltonian</option>
+      </select>
+    </div>
+    <button class="alt" id="demoBtn">load system</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">player</div>
+    <div class="player">
+      <div id="playerHost"><div class="ph">synthetic · no frames</div></div>
+      <div class="player-meta">
+        <span>frame · <span class="cur" id="pmCur">—</span></span>
+        <span>orig idx · <span class="tot" id="pmOrig">—</span></span>
+      </div>
+    </div>
+    <div class="play-controls">
+      <button class="muted" id="playPrev" title="prev">‹</button>
+      <button class="muted" id="playPlay" title="play/pause">▶</button>
+      <button class="muted" id="playNext" title="next">›</button>
+      <button class="muted" id="playLoop" title="loop" style="color:var(--plasma); border-color:var(--plasma);">↻</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">view mode</div>
+    <div class="field">
+      <label>projection</label>
+      <select id="viewMode">
+        <option value="phase_space">phase space · direct 3D</option>
+        <option value="time_helix">time helix · z=t</option>
+        <option value="takens_delay">Takens · (s,s+τ,s+2τ)</option>
+        <option value="polar_time">polar · angle=t, radius=‖z‖</option>
+        <option value="audio">audio trajectory · wav2vec2</option>
+        <option value="sfa">SFA · slow feature analysis</option>
+      </select>
+    </div>
+    <div class="slider-field" id="tauField" style="display:none;">
+      <label>delay τ</label>
+      <span class="val" id="tauVal">5</span>
+      <input type="range" class="param-slider" id="paramTau" min="1" max="40" value="5" step="1" />
+    </div>
+    <div id="viewModeDesc" style="font-size: 9px; color: rgba(255,255,255,0.45); line-height: 1.4; margin-top: 4px;">
+      Direct 3D : trajectoire dans espace réduit, temps = ordre.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">color mode</div>
+    <div class="field">
+      <label>map</label>
+      <select id="colorMode">
+        <option value="time">time · cyan→magenta→amber</option>
+        <option value="velocity_umap">velocity · UMAP projection</option>
+        <option value="velocity_perceptual">velocity · perceptual (true)</option>
+        <option value="cluster">cluster · HDBSCAN labels</option>
+        <option value="surprise">surprise · prediction error</option>
+      </select>
+    </div>
+    <div class="mgrid" id="velStats" style="display:none; margin-top: 6px; font-size: 9px;">
+      <span class="k">metric</span><span class="v" id="v_metric">—</span>
+      <span class="k">mean</span><span class="v" id="v_mean">—</span>
+      <span class="k">std</span><span class="v" id="v_std">—</span>
+      <span class="k">max</span><span class="v" id="v_max">—</span>
+    </div>
+    <div id="v_explainer" style="font-size: 9px; color: rgba(255,255,255,0.45); line-height: 1.4; margin-top: 6px; display: none;"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">workspace</div>
+    <div class="btn-row">
+      <button class="muted" id="saveBtn">save</button>
+      <button class="muted" id="exportBtn">export</button>
+    </div>
+    <button class="muted" id="histToggle" style="margin-top:6px;">history</button>
+    <button id="compareBtn" style="margin-top:6px; color: var(--plasma); border-color: var(--plasma);">overlay another run</button>
+    <button id="clearOverlayBtn" style="margin-top:6px; color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.2); display:none;">clear overlay</button>
+  </div>
+</div>
+
+<!-- ─── CENTER : Three.js canvas ───────────────────────────── -->
+<canvas id="canvas"></canvas>
+<div class="axis-overlay" id="axisOverlay">
+  <div class="ax-line"><span class="swatch" style="background:#00e5ff; color:#00e5ff;"></span><span class="lbl">X</span><span class="desc" id="axOvX">—</span></div>
+  <div class="ax-line"><span class="swatch" style="background:#ff2dd4; color:#ff2dd4;"></span><span class="lbl">Y</span><span class="desc" id="axOvY">—</span></div>
+  <div class="ax-line"><span class="swatch" style="background:#ffb400; color:#ffb400;"></span><span class="lbl">Z</span><span class="desc" id="axOvZ">—</span></div>
+</div>
+<div class="grain"></div>
+
+<!-- ─── RIGHT SIDEBAR : analysis tabs ──────────────────────── -->
+<div class="sidebar right">
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="dynamics">dynamics</button>
+    <button class="tab" data-tab="spectral">spectral</button>
+    <button class="tab" data-tab="causal">causal</button>
+    <button class="tab" data-tab="topology">topology</button>
+    <button class="tab" data-tab="sindy">SINDy · φ</button>
+    <button class="tab" data-tab="inspect">inspect</button>
+    <button class="tab" data-tab="segments">segments</button>
+    <button class="tab" data-tab="clusters">clusters</button>
+    <button class="tab" data-tab="predict">predict</button>
+    <button class="tab" data-tab="dna">DNA</button>
+    <button class="tab" data-tab="evolution">evolution</button>
+    <button class="tab" data-tab="status">status</button>
+  </div>
+
+  <!-- Dynamics -->
+  <div class="tab-panel active" data-panel="dynamics">
+    <h2>RECURRENCE · RQA · LYAPUNOV</h2>
+    <div class="mgrid">
+      <span class="k">λ (Lyapunov)</span><span class="v" id="m_lyap">—</span>
+      <span class="k">corr. dim</span><span class="v" id="m_d2">—</span>
+      <span class="k">RR</span><span class="v" id="m_rr">—</span>
+      <span class="k">DET</span><span class="v" id="m_det">—</span>
+      <span class="k">LAM</span><span class="v" id="m_lam">—</span>
+      <span class="k">ε</span><span class="v" id="m_eps">—</span>
+    </div>
+    <canvas id="recCanvas" class="analysis-canvas"></canvas>
+    <div class="panel-caption">recurrence plot</div>
+    <div class="panel-actions"><button id="computeBtn">compute dynamics</button></div>
+  </div>
+
+  <!-- Spectral -->
+  <div class="tab-panel" data-panel="spectral">
+    <h2>KOOPMAN · DMD · MULTISCALE</h2>
+    <canvas id="koopmanCanvas" class="analysis-canvas"></canvas>
+    <div class="panel-caption">koopman · unit disk</div>
+    <div class="mgrid" style="margin-top:10px;">
+      <span class="k">rank</span><span class="v" id="s_rank">—</span>
+      <span class="k">modes</span><span class="v" id="s_modes">—</span>
+      <span class="k">spectral slope</span><span class="v" id="s_slope">—</span>
+    </div>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 10px; letter-spacing: 0.14em;">entropy ladder</div>
+    <div id="ladder"></div>
+    <div class="panel-actions"><button id="spectralBtn">compute spectral</button></div>
+  </div>
+
+  <!-- Causal -->
+  <div class="tab-panel" data-panel="causal">
+    <h2>CAUSAL FLOW · TE · GRANGER</h2>
+    <canvas id="causalCanvas" class="analysis-canvas"></canvas>
+    <div class="panel-caption">node = latent dim · edge = transfer entropy</div>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 8px;">
+      <span style="color:var(--cyan);">●</span> latent dim &nbsp;&nbsp;
+      <span style="color:var(--amber);">→</span> TE direction
+    </div>
+    <div class="panel-actions"><button id="causalBtn">compute causal</button></div>
+  </div>
+
+  <!-- Topology -->
+  <div class="tab-panel" data-panel="topology">
+    <h2>PERSISTENT HOMOLOGY · H0 / H1</h2>
+    <canvas id="persistCanvas" class="analysis-canvas"></canvas>
+    <div class="panel-caption">persistence diagram · Vietoris-Rips</div>
+    <div class="mgrid" style="margin-top:10px;">
+      <span class="k">H0 cycles</span><span class="v" id="t_h0">—</span>
+      <span class="k">H1 cycles</span><span class="v" id="t_h1">—</span>
+      <span class="k">H0 entropy</span><span class="v" id="t_eh0">—</span>
+      <span class="k">H1 entropy</span><span class="v" id="t_eh1">—</span>
+      <span class="k">sliding windows</span><span class="v" id="t_win">—</span>
+    </div>
+    <div class="panel-actions"><button id="topoBtn">compute topology</button></div>
+  </div>
+
+  <!-- SINDy + Emergence -->
+  <div class="tab-panel" data-panel="sindy">
+    <h2>SINDy · DISCOVERED EQUATIONS</h2>
+    <div id="sindyEqs" style="margin-bottom: 8px;"></div>
+    <div class="sindy-meta">
+      <span>R² <b id="s_r2">—</b></span>
+      <span>active <b id="s_active">—</b></span>
+      <span>order <b id="s_order">—</b></span>
+      <span>compute <b id="s_time">—</b></span>
+    </div>
+    <div style="margin-top:16px; padding-top:12px; border-top: 1px solid var(--border);">
+      <h2 style="color: var(--plasma); margin-bottom: 8px;">EMERGENCE · φ-id</h2>
+      <div class="sindy-meta">
+        <span>φ_id ≈ <b id="phi_id" style="color:var(--plasma);">—</b></span>
+        <span>optimal scale <b id="phi_scale" style="color:var(--cyan);">—</b></span>
+        <span>EI micro <b id="ei_micro" style="color:var(--amber);">—</b></span>
+      </div>
+      <div id="emergenceLadder" style="margin-top:8px;"></div>
+    </div>
+    <div class="panel-actions"><button id="sindyBtn">discover equations</button></div>
+  </div>
+
+  <!-- Frame inspector + kNN -->
+  <div class="tab-panel" data-panel="inspect">
+    <h2>FRAME INSPECTOR · k-NN</h2>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); margin-bottom: 10px; line-height: 1.4;">
+      Clic sur point 3D = sélection frame. Voisins = k frames les plus proches dans <b style="color:var(--cyan);">espace latent original 2048d</b> (pas UMAP). Révèle ce que l'encoder considère sémantiquement similaire.
+    </div>
+    <div id="inspectFocus" style="display:none;">
+      <div style="font-family: var(--mono); font-size: 10px; color: var(--amber); letter-spacing: 0.14em; margin-bottom: 4px;">SELECTED FRAME</div>
+      <div id="focusFrame" style="position:relative;">
+        <img id="focusImg" style="width:100%; border:2px solid var(--cyan); border-radius:2px; display:block;" />
+        <div id="focusMeta" style="position:absolute; bottom:0; left:0; right:0; padding:4px 6px; font-family: var(--mono); font-size:9px; background:rgba(0,0,0,0.6); color:var(--cyan);"></div>
+      </div>
+      <div style="font-family: var(--mono); font-size: 10px; color: var(--plasma); letter-spacing: 0.14em; margin: 14px 0 6px;">k-NEAREST · 2048d COSINE</div>
+      <div id="knnGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px;"></div>
+    </div>
+    <div id="inspectEmpty" style="color: rgba(255,255,255,0.4); font-family: var(--mono); font-size: 10px; padding: 12px 0;">No frame selected. Clic on a point in 3D space.</div>
+    <div class="panel-actions"><button id="clearFocusBtn" class="muted">clear selection</button></div>
+
+    <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border);">
+      <h2 style="color: var(--plasma);">CLIP TEXT QUERY</h2>
+      <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); margin-bottom: 8px; line-height: 1.4;">
+        Cherche frames matching un prompt texte. Requires : video encodee avec <b style="color:var(--cyan);">clip_vit_b32</b>.
+      </div>
+      <input type="text" id="clipQuery" placeholder="e.g. 'a colorful fractal', 'fire flames'" style="width: 100%; background: #000; color: var(--fg); border: 1px solid var(--border-strong); padding: 7px 9px; font-family: var(--mono); font-size: 11px; border-radius: 2px; outline: none; margin-bottom: 6px;" />
+      <button id="clipBtn" style="color: var(--plasma); border-color: var(--plasma);">search frames</button>
+      <div id="clipResults" style="display:none; margin-top: 10px;">
+        <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin-bottom: 4px;">TOP MATCHES</div>
+        <div id="clipGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Segments / boundary detection -->
+  <div class="tab-panel" data-panel="segments">
+    <h2>SHOT / EVENT BOUNDARIES</h2>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; margin-bottom: 10px;">
+      Detection automatique de transitions via peaks de <b style="color: var(--cyan);">velocity perceptuelle</b> (cosine distance frame-a-frame dans espace 2048d).
+    </div>
+    <div class="field">
+      <label>method</label>
+      <select id="segMethod">
+        <option value="adaptive">adaptive · median + sens × MAD</option>
+        <option value="std">std · mean + sens × std</option>
+        <option value="percentile">percentile · 95 - 10×sens</option>
+      </select>
+    </div>
+    <div class="slider-field">
+      <label>sensitivity</label>
+      <span class="val" id="segSensVal">1.0</span>
+      <input type="range" class="param-slider" id="segSens" min="0" max="50" value="10" step="1" />
+    </div>
+    <div class="slider-field">
+      <label>min segment</label>
+      <span class="val" id="segMinVal">4</span>
+      <input type="range" class="param-slider" id="segMin" min="2" max="20" value="4" step="1" />
+    </div>
+    <button id="segBtn" style="color: var(--amber); border-color: var(--amber);">detect boundaries</button>
+    <div id="segResult" style="margin-top: 12px; display: none;">
+      <div class="mgrid" style="margin-bottom: 10px;">
+        <span class="k">boundaries</span><span class="v" id="segNB">—</span>
+        <span class="k">segments</span><span class="v" id="segNS">—</span>
+        <span class="k">threshold</span><span class="v" id="segThr">—</span>
+      </div>
+      <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin-bottom: 4px;">SEGMENTS TIMELINE</div>
+      <div id="segTimeline" style="height: 28px; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 2px; display: flex; overflow: hidden; cursor: pointer;"></div>
+      <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin: 12px 0 4px;">VELOCITY PROFILE</div>
+      <canvas id="velocityChart" class="analysis-canvas" style="aspect-ratio: 5/2; max-width:100%;"></canvas>
+    </div>
+  </div>
+
+  <!-- Clusters -->
+  <div class="tab-panel" data-panel="clusters">
+    <h2>HDBSCAN CLUSTER DISCOVERY</h2>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; margin-bottom: 10px;">
+      Découverte non-supervisée de clusters dans espace latent <b style="color:var(--cyan);">original</b>. HDBSCAN ne nécessite pas k, identifie density-based clusters + bruit.
+    </div>
+    <div class="slider-field">
+      <label>min cluster size</label>
+      <span class="val" id="mcsVal">5</span>
+      <input type="range" class="param-slider" id="mcs" min="2" max="30" value="5" step="1" />
+    </div>
+    <div class="field">
+      <label>metric</label>
+      <select id="hdbsMetric">
+        <option value="euclidean">euclidean</option>
+        <option value="manhattan">manhattan</option>
+        <option value="cosine">cosine</option>
+      </select>
+    </div>
+    <button id="clusterBtn" style="color: var(--plasma); border-color: var(--plasma);">discover clusters</button>
+
+    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);">
+      <div style="font-family: var(--mono); font-size: 9px; color: var(--amber); letter-spacing: 0.16em; margin-bottom: 6px;">CLIP AUTO-LABEL</div>
+      <textarea id="vocabInput" rows="3" placeholder="One label per line, e.g.:&#10;bright fractal&#10;dark spiral&#10;colorful pattern&#10;deep zoom" style="width:100%; background:#000; color:var(--fg); border:1px solid var(--border-strong); padding:6px 8px; font-family:var(--mono); font-size:10px; border-radius:2px; outline:none; resize:vertical;">bright fractal
+dark spiral
+colorful pattern
+deep zoom
+warm red colors
+cool blue colors
+green landscape
+empty void</textarea>
+      <button id="labelBtn" style="color: var(--amber); border-color: var(--amber); margin-top: 6px;">label clusters via CLIP</button>
+    </div>
+
+    <button id="transBtn" style="color: var(--cyan); border-color: var(--cyan); margin-top: 6px;">show transitions graph</button>
+    <canvas id="transCanvas" class="analysis-canvas" style="aspect-ratio: 1/1; display:none; margin-top:8px;"></canvas>
+    <div id="transCaption" class="panel-caption" style="display:none;">cluster transitions · arrow thickness ∝ count</div>
+    <div id="clusterResult" style="margin-top: 12px; display: none;">
+      <div class="mgrid">
+        <span class="k">n_clusters</span><span class="v" id="cluN">—</span>
+        <span class="k">noise frames</span><span class="v" id="cluNoise">—</span>
+        <span class="k">compute</span><span class="v" id="cluT">—</span>
+      </div>
+      <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin: 10px 0 4px;">CLUSTERS</div>
+      <div id="cluList"></div>
+    </div>
+  </div>
+
+  <!-- Predict / surprise -->
+  <div class="tab-panel" data-panel="predict">
+    <h2>LATENT PREDICTION · SURPRISE</h2>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; margin-bottom: 10px;">
+      Train MLP minimal <span style="color:var(--cyan);">f(z[t]) → z[t+1]</span>. Error per frame = <b style="color:var(--magenta);">surprise</b>. Lien : world models, free energy, JEPA.
+    </div>
+    <div class="slider-field">
+      <label>epochs</label>
+      <span class="val" id="epVal">150</span>
+      <input type="range" class="param-slider" id="epochs" min="50" max="500" value="150" step="10" />
+    </div>
+    <div class="slider-field">
+      <label>hidden dim</label>
+      <span class="val" id="hidVal">256</span>
+      <input type="range" class="param-slider" id="hidden" min="32" max="512" value="256" step="32" />
+    </div>
+    <button id="predictBtn" style="color: var(--magenta); border-color: var(--magenta);">train predictor</button>
+    <div class="slider-field" style="margin-top: 10px;">
+      <label>rollout horizon</label>
+      <span class="val" id="horVal">20</span>
+      <input type="range" class="param-slider" id="horizon" min="5" max="60" value="20" step="1" />
+    </div>
+    <button id="rolloutBtn" style="color: #ff66cc; border-color: #ff66cc;">rollout from current frame</button>
+    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);">
+      <div style="font-family: var(--mono); font-size: 9px; color: var(--amber); letter-spacing: 0.16em; margin-bottom: 6px;">COUNTERFACTUAL · cone of futures</div>
+      <div class="slider-field">
+        <label>n samples</label>
+        <span class="val" id="cfNVal">8</span>
+        <input type="range" class="param-slider" id="cfN" min="2" max="20" value="8" step="1" />
+      </div>
+      <div class="slider-field">
+        <label>noise scale</label>
+        <span class="val" id="cfNoiseVal">0.05</span>
+        <input type="range" class="param-slider" id="cfNoise" min="0" max="50" value="5" step="1" />
+      </div>
+      <button id="cfBtn" style="color: var(--amber); border-color: var(--amber);">imagine futures</button>
+    </div>
+    <div id="predictResult" style="margin-top: 12px; display: none;">
+      <div class="mgrid">
+        <span class="k">predictability</span><span class="v" id="prPred">—</span>
+        <span class="k">mean error</span><span class="v" id="prMean">—</span>
+        <span class="k">vs baseline</span><span class="v" id="prRatio">—</span>
+        <span class="k">final loss</span><span class="v" id="prLoss">—</span>
+        <span class="k">compute</span><span class="v" id="prTime">—</span>
+        <span class="k">device</span><span class="v" id="prDev">—</span>
+      </div>
+      <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin: 10px 0 4px;">SURPRISE PROFILE</div>
+      <canvas id="surpriseChart" class="analysis-canvas" style="aspect-ratio: 5/2;"></canvas>
+      <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.4); margin-top: 4px;">
+        cyan = MLP surprise · amber = baseline (z[t+1]=z[t])
+      </div>
+    </div>
+  </div>
+
+  <!-- Video DNA -->
+  <div class="tab-panel" data-panel="dna">
+    <h2>VIDEO DNA · COMPOSITE COMPLEXITY</h2>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; margin-bottom: 10px;">
+      Synthèse multi-dimensionnelle de toutes les analyses. Score 0-100 + classification + radar 7-axes.
+    </div>
+    <button id="dnaBtn" style="color: var(--plasma); border-color: var(--plasma);">compute DNA</button>
+    <div id="dnaResult" style="display:none; margin-top: 14px;">
+      <div style="text-align: center; padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+        <div id="dnaScore" style="font-family: var(--mono); font-size: 48px; color: var(--plasma); text-shadow: 0 0 20px var(--plasma); letter-spacing: 0.05em;">—</div>
+        <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 0.2em; margin-top: 4px;">COMPLEXITY · /100</div>
+        <div id="dnaLabel" style="font-family: var(--mono); font-size: 11px; color: var(--cyan); margin-top: 10px; letter-spacing: 0.08em;">—</div>
+      </div>
+      <canvas id="dnaRadar" class="analysis-canvas" style="aspect-ratio: 1/1; margin-top: 12px;"></canvas>
+      <div class="panel-caption">7-axis radar · normalised [0..1]</div>
+      <div style="margin-top: 12px; font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em;">RAW METRICS</div>
+      <div id="dnaRaw" class="mgrid" style="margin-top: 4px;"></div>
+    </div>
+  </div>
+
+  <!-- Sliding window evolution -->
+  <div class="tab-panel" data-panel="evolution">
+    <h2>METRICS EVOLUTION · SLIDING WINDOW</h2>
+    <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; margin-bottom: 10px;">
+      Évolution des metrics par fenêtre temporelle. Révèle où vidéo devient + complexe / + prédictible / + clusterée.
+    </div>
+    <div class="slider-field">
+      <label>window</label>
+      <span class="val" id="evWinVal">24</span>
+      <input type="range" class="param-slider" id="evWin" min="8" max="60" value="24" step="2" />
+    </div>
+    <div class="slider-field">
+      <label>stride</label>
+      <span class="val" id="evStrVal">8</span>
+      <input type="range" class="param-slider" id="evStr" min="2" max="30" value="8" step="1" />
+    </div>
+    <button id="evBtn" style="color: var(--cyan); border-color: var(--cyan);">compute evolution</button>
+    <div id="evResult" style="display:none; margin-top: 12px;">
+      <div class="mgrid">
+        <span class="k">n_windows</span><span class="v" id="evN">—</span>
+        <span class="k">compute</span><span class="v" id="evT">—</span>
+      </div>
+      <canvas id="evChart" class="analysis-canvas" style="aspect-ratio: 5/3;"></canvas>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-family: var(--mono); font-size: 9px; margin-top: 6px;">
+        <span style="color: var(--cyan);">● velocity</span>
+        <span style="color: var(--magenta);">● local dim</span>
+        <span style="color: var(--amber);">● clusters</span>
+        <span style="color: var(--plasma);">● predict</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status / metadata -->
+  <div class="tab-panel" data-panel="status">
+    <h2>RUN METADATA</h2>
+    <div class="mgrid">
+      <span class="k">source</span><span class="v" id="m_src">—</span>
+      <span class="k">encoder</span><span class="v" id="m_encoder">—</span>
+      <span class="k">latent dim</span><span class="v" id="m_ldim">—</span>
+      <span class="k">points</span><span class="v" id="m_npts">—</span>
+      <span class="k">encode time</span><span class="v" id="m_tenc">—</span>
+      <span class="k">reduce time</span><span class="v" id="m_tred">—</span>
+    </div>
+
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+      <h2 style="color: var(--amber); margin-bottom: 8px;">PHASE-SPACE AXES</h2>
+      <div class="mgrid">
+        <span class="k" style="color: var(--cyan);">● X</span><span class="v" id="ax_x">—</span>
+        <span class="k" style="color: var(--magenta);">● Y</span><span class="v" id="ax_y">—</span>
+        <span class="k" style="color: var(--amber);">● Z</span><span class="v" id="ax_z">—</span>
+      </div>
+      <div id="axesDescription" style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.5; margin-top: 8px;">
+        Loading…
+      </div>
+    </div>
+
+    <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.4); letter-spacing: 0.14em; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);">
+      pipeline · ingestion → encoder → UMAP 3D → analysis
+    </div>
+    <div class="panel-actions">
+      <button id="runAllBtn">run all analyses</button>
+      <button id="reportBtn" style="margin-top: 6px; color: var(--amber); border-color: var(--amber);">export HTML report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── BOTTOM BAR : scrubber + frame counter ──────────────── -->
+<div class="bottombar">
+  <div class="left-info">
+    <span class="frame-counter"><span id="frame_idx">—</span><span class="sep">/</span><span class="tot" id="frame_total">—</span></span>
+  </div>
+  <div class="scrubber-wrap">
+    <div class="scrubber-row">
+      <span style="font-family: var(--mono); font-size: 9px; color: rgba(0,229,255,0.6); letter-spacing: 0.16em;">t=0</span>
+      <input type="range" class="scrubber" id="scrubber" min="0" max="100" value="100" />
+      <span style="font-family: var(--mono); font-size: 9px; color: rgba(255,45,212,0.7); letter-spacing: 0.16em;">t=N</span>
+    </div>
+    <div class="color-legend" id="colorLegend">
+      <span class="end" id="legendStart" style="color: var(--cyan);">t=0</span>
+      <span class="grad time" id="legendGrad"></span>
+      <span class="end" id="legendEnd" style="color: var(--amber);">t=N</span>
+    </div>
+  </div>
+  <div class="right-info">
+    <span id="status"></span>
+  </div>
+</div>
+
+<!-- ─── History modal ──────────────────────────────────────── -->
+<div class="history-modal" id="histPanel">
+  <div class="content">
+    <button class="modal-close" id="histClose">×</button>
+    <h2>EXPERIMENTS</h2>
+    <div id="histList"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.06);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 100);
+camera.position.set(3, 2.2, 3.4);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = 0.6;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.9, 0.35, 0.05);
+composer.addPass(bloom);
+
+// resize bind to canvas grid cell
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(1, rect.width);
+  const h = Math.max(1, rect.height);
+  renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  bloom.resolution.set(w, h);
+}
+new ResizeObserver(resizeCanvas).observe(canvas);
+resizeCanvas();
+
+// Axes
+const axesHelper = new THREE.Group();
+const mkAxis = (color, dir) => {
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.18 });
+  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), dir]);
+  return new THREE.Line(g, mat);
+};
+axesHelper.add(mkAxis(0x00e5ff, new THREE.Vector3(1.3, 0, 0)));
+axesHelper.add(mkAxis(0xff2dd4, new THREE.Vector3(0, 1.3, 0)));
+axesHelper.add(mkAxis(0xffb400, new THREE.Vector3(0, 0, 1.3)));
+scene.add(axesHelper);
+
+const grid = new THREE.GridHelper(3, 12, 0x113344, 0x0a1a22);
+grid.position.y = -1.1;
+scene.add(grid);
+
+let pointsObj = null, lineObj = null, activeMarker = null;
+let ghostLine = null, ghostPoints = null;
+let cfGhosts = [];  // counterfactual lines
+let overlayObj = null, overlayLine = null;  // second video trajectory
+let trajCoords = null;
+let currentT = 1.0;
+
+const tmpColor = new THREE.Color();
+function gradient(t) {
+  // Mode temps : cyan -> magenta -> amber
+  if (t < 0.5) {
+    const u = t * 2;
+    return tmpColor.setRGB(0 * (1 - u) + 1 * u, 0.9 * (1 - u) + 0.17 * u, 1.0 * (1 - u) + 0.83 * u);
+  } else {
+    const u = (t - 0.5) * 2;
+    return tmpColor.setRGB(1 * (1 - u) + 1 * u, 0.17 * (1 - u) + 0.7 * u, 0.83 * (1 - u) + 0.0 * u);
+  }
+}
+function velocityColor(v) {
+  // Mode vitesse : bleu profond -> vert -> orange -> rouge (jet-style)
+  v = Math.max(0, Math.min(1, v));
+  if (v < 0.25) { const u = v / 0.25; return tmpColor.setRGB(0.1, 0.2 + u * 0.5, 0.6 + u * 0.4); }
+  if (v < 0.5)  { const u = (v - 0.25) / 0.25; return tmpColor.setRGB(0.1 + u * 0.1, 0.7 + u * 0.3, 1.0 - u * 0.5); }
+  if (v < 0.75) { const u = (v - 0.5) / 0.25; return tmpColor.setRGB(0.2 + u * 0.7, 1.0 - u * 0.3, 0.5 - u * 0.3); }
+  const u = (v - 0.75) / 0.25;
+  return tmpColor.setRGB(0.9 + u * 0.1, 0.7 - u * 0.6, 0.2 - u * 0.2);
+}
+
+let velocities = null;       // espacement UMAP 3D (projection)
+let velMax = 1;
+let perceptualVel = null;    // vraie vitesse latente (espace original)
+let perceptualMax = 1;
+let velocityMetricName = '—';
+let clusterLabels = null;    // HDBSCAN per-frame labels
+let clusterData = null;      // full response
+let surpriseVec = null;      // per-frame prediction error
+let surpriseMax = 1;
+
+const CLUSTER_PALETTE = [
+  [0.0, 0.9, 1.0], [1.0, 0.17, 0.83], [1.0, 0.7, 0.0], [0.0, 1.0, 0.53],
+  [1.0, 0.4, 0.8], [0.4, 1.0, 0.8], [1.0, 0.8, 0.0], [1.0, 0.47, 0.4],
+  [0.64, 1.0, 0.4], [0.4, 0.64, 1.0], [0.85, 0.4, 1.0], [1.0, 0.55, 0.55],
+];
+
+function clearTrajectory() {
+  if (pointsObj) { scene.remove(pointsObj); pointsObj.geometry.dispose(); pointsObj.material.dispose(); pointsObj = null; }
+  if (lineObj) { scene.remove(lineObj); lineObj.geometry.dispose(); lineObj.material.dispose(); lineObj = null; }
+  if (activeMarker) { scene.remove(activeMarker); activeMarker.geometry.dispose(); activeMarker.material.dispose(); activeMarker = null; }
+  clearGhost();
+}
+
+function clearGhost() {
+  if (ghostLine) { scene.remove(ghostLine); ghostLine.geometry.dispose(); ghostLine.material.dispose(); ghostLine = null; }
+  if (ghostPoints) { scene.remove(ghostPoints); ghostPoints.geometry.dispose(); ghostPoints.material.dispose(); ghostPoints = null; }
+  clearCounterfactuals();
+}
+
+function clearOverlay() {
+  if (overlayObj) { scene.remove(overlayObj); overlayObj.geometry.dispose(); overlayObj.material.dispose(); overlayObj = null; }
+  if (overlayLine) { scene.remove(overlayLine); overlayLine.geometry.dispose(); overlayLine.material.dispose(); overlayLine = null; }
+}
+
+function drawOverlay(coords, paletteHueOffset = 0.5) {
+  clearOverlay();
+  const n = coords.length;
+  const positions = new Float32Array(n * 3);
+  const colors = new Float32Array(n * 3);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    positions[i*3] = coords[i][0];
+    positions[i*3+1] = coords[i][1];
+    positions[i*3+2] = coords[i][2];
+    const hue = (paletteHueOffset + 0.3 * (i / Math.max(n-1, 1))) % 1.0;
+    tmp.setHSL(hue, 0.9, 0.6);
+    colors[i*3] = tmp.r; colors[i*3+1] = tmp.g; colors[i*3+2] = tmp.b;
+  }
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  pg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  overlayObj = new THREE.Points(pg, new THREE.PointsMaterial({
+    size: 0.022, vertexColors: true, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  }));
+  scene.add(overlayObj);
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  lg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  overlayLine = new THREE.Line(lg, new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.45,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  scene.add(overlayLine);
+}
+
+function clearCounterfactuals() {
+  for (const g of cfGhosts) { scene.remove(g); g.geometry.dispose(); g.material.dispose(); }
+  cfGhosts = [];
+}
+
+function drawCounterfactuals(rollouts, startIdx) {
+  clearCounterfactuals();
+  if (!trajCoords) return;
+  const N = rollouts.length;
+  for (let s = 0; s < N; s++) {
+    const path = [trajCoords[startIdx], ...rollouts[s]];
+    const positions = new Float32Array(path.length * 3);
+    for (let i = 0; i < path.length; i++) {
+      positions[i*3] = path[i][0];
+      positions[i*3+1] = path[i][1];
+      positions[i*3+2] = path[i][2];
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    // Couleur variant par sample (hue rotation)
+    const hue = (s / N) * 0.7 + 0.05;  // skip rouge pur
+    const c = new THREE.Color().setHSL(hue, 0.9, 0.6);
+    const line = new THREE.Line(g, new THREE.LineBasicMaterial({
+      color: c, transparent: true, opacity: 0.45,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    scene.add(line);
+    cfGhosts.push(line);
+  }
+}
+
+function drawGhost(ghost3d, startIdx) {
+  clearGhost();
+  if (!ghost3d || !ghost3d.length || !trajCoords) return;
+  // Inclut start point pour continuité visuelle
+  const pts = [trajCoords[startIdx], ...ghost3d];
+  const n = pts.length;
+  const positions = new Float32Array(n * 3);
+  const colors = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    positions[i*3] = pts[i][0];
+    positions[i*3+1] = pts[i][1];
+    positions[i*3+2] = pts[i][2];
+    // Fade ghost color : magenta brillant -> rose pale
+    const t = i / Math.max(n - 1, 1);
+    colors[i*3] = 1.0;
+    colors[i*3+1] = 0.4 - t * 0.3;
+    colors[i*3+2] = 0.83 - t * 0.5;
+  }
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  lg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  ghostLine = new THREE.Line(lg, new THREE.LineDashedMaterial({
+    vertexColors: true, transparent: true, opacity: 0.9,
+    dashSize: 0.06, gapSize: 0.03, scale: 1.0, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  ghostLine.computeLineDistances();
+  scene.add(ghostLine);
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  pg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  ghostPoints = new THREE.Points(pg, new THREE.PointsMaterial({
+    size: 0.035, vertexColors: true, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  }));
+  scene.add(ghostPoints);
+}
+
+function computeVelocities(coords) {
+  const n = coords.length;
+  const v = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    if (i === 0) { v[i] = 0; continue; }
+    const dx = coords[i][0] - coords[i-1][0];
+    const dy = coords[i][1] - coords[i-1][1];
+    const dz = coords[i][2] - coords[i-1][2];
+    v[i] = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  }
+  v[0] = v[1] || 0;
+  velocities = v;
+  velMax = Math.max(...v, 1e-9);
+}
+
+function pointColorFor(i, n) {
+  const mode = document.getElementById('colorMode').value;
+  if (mode === 'velocity_umap' && velocities) {
+    return velocityColor(velocities[i] / velMax);
+  }
+  if (mode === 'velocity_perceptual' && perceptualVel) {
+    return velocityColor(perceptualVel[i] / perceptualMax);
+  }
+  if (mode === 'cluster' && clusterLabels) {
+    const lbl = clusterLabels[i];
+    if (lbl === -1) return tmpColor.setRGB(0.18, 0.18, 0.22);
+    const c = CLUSTER_PALETTE[lbl % CLUSTER_PALETTE.length];
+    return tmpColor.setRGB(c[0], c[1], c[2]);
+  }
+  if (mode === 'surprise' && surpriseVec) {
+    return velocityColor(surpriseVec[i] / surpriseMax);
+  }
+  return gradient(i / Math.max(n - 1, 1));
+}
+
+function updateVelStatsPanel() {
+  const mode = document.getElementById('colorMode').value;
+  const isVel = mode.startsWith('velocity_');
+  document.getElementById('velStats').style.display = isVel ? 'grid' : 'none';
+  document.getElementById('v_explainer').style.display = isVel ? 'block' : 'none';
+  if (!isVel) return;
+  let arr, label, explainer;
+  if (mode === 'velocity_umap') {
+    arr = velocities; label = '‖Δz‖ UMAP 3D';
+    explainer = 'Distance euclidienne entre frames consécutives DANS la projection UMAP. ⚠ déformée par UMAP (préserve voisinages, pas distances). Utile pour lire topologie projection, pas nouveauté visuelle.';
+  } else {
+    arr = perceptualVel; label = velocityMetricName;
+    explainer = velocityMetricName === 'cosine_distance'
+      ? 'Cosine distance entre features ResNet 2048d frame[t] et frame[t+1]. = vraie nouveauté visuelle perçue par l\'encoder. Pas distordue par UMAP.'
+      : 'Distance euclidienne dans l\'espace de phase brut. = vitesse physique vraie ‖ẋ‖·Δt.';
+  }
+  if (!arr || !arr.length) return;
+  const n = arr.length;
+  const sum = arr.reduce((a,b)=>a+b, 0);
+  const mean = sum / n;
+  const variance = arr.reduce((a,b)=>a+(b-mean)*(b-mean), 0) / n;
+  const std = Math.sqrt(variance);
+  const max = Math.max(...arr);
+  document.getElementById('v_metric').textContent = label;
+  document.getElementById('v_mean').textContent = mean.toFixed(4);
+  document.getElementById('v_std').textContent = std.toFixed(4);
+  document.getElementById('v_max').textContent = max.toFixed(4);
+  document.getElementById('v_explainer').textContent = explainer;
+}
+
+// ─── View mode transformations ─────────────────────────────
+let originalCoords = null;  // sauvegarde coords brutes pour pouvoir re-transformer
+
+function transformCoords(coords, mode, tau) {
+  const n = coords.length;
+  if (mode === 'time_helix') {
+    // X-Y restent, Z devient temps
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const tz = 2 * i / Math.max(n - 1, 1) - 1;
+      out[i] = [coords[i][0], coords[i][1], tz];
+    }
+    return normalizeRange(out);
+  }
+  if (mode === 'takens_delay') {
+    // Scalar = première composante. Embed (s[t], s[t+τ], s[t+2τ])
+    const s = coords.map(c => c[0]);
+    const out = [];
+    const span = 2 * tau;
+    for (let i = 0; i < n - span; i++) {
+      out.push([s[i], s[i + tau], s[i + 2 * tau]]);
+    }
+    return normalizeRange(out);
+  }
+  if (mode === 'polar_time') {
+    // Angle = temps mod 2π, rayon = norme coord, z = composante 3
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const theta = (i / Math.max(n - 1, 1)) * Math.PI * 4;  // 2 tours
+      const r = Math.sqrt(coords[i][0]**2 + coords[i][1]**2);
+      out[i] = [r * Math.cos(theta), r * Math.sin(theta), coords[i][2]];
+    }
+    return normalizeRange(out);
+  }
+  // phase_space : pas de transformation
+  return coords;
+}
+
+function normalizeRange(out) {
+  const n = out.length;
+  if (n === 0) return out;
+  const mins = [Infinity, Infinity, Infinity];
+  const maxs = [-Infinity, -Infinity, -Infinity];
+  for (const p of out) for (let j = 0; j < 3; j++) {
+    if (p[j] < mins[j]) mins[j] = p[j];
+    if (p[j] > maxs[j]) maxs[j] = p[j];
+  }
+  return out.map(p => p.map((v, j) => {
+    const span = Math.max(maxs[j] - mins[j], 1e-6);
+    return 2 * (v - mins[j]) / span - 1;
+  }));
+}
+
+function buildTrajectory(coords) {
+  clearTrajectory();
+  originalCoords = coords;
+  // Applique mode actif
+  const mode = document.getElementById('viewMode').value;
+  const tau = parseInt(document.getElementById('paramTau').value);
+  trajCoords = transformCoords(coords, mode, tau);
+  computeVelocities(trajCoords);
+  const n = trajCoords.length;
+  const positions = new Float32Array(n * 3);
+  const colors = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    positions[i * 3] = trajCoords[i][0];
+    positions[i * 3 + 1] = trajCoords[i][1];
+    positions[i * 3 + 2] = trajCoords[i][2];
+    const c = pointColorFor(i, n);
+    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  pg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  pointsObj = new THREE.Points(pg, new THREE.PointsMaterial({
+    size: 0.028, vertexColors: true, transparent: true, opacity: 0.95,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  }));
+  scene.add(pointsObj);
+
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  lg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  lineObj = new THREE.Line(lg, new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  scene.add(lineObj);
+
+  activeMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.045, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })
+  );
+  scene.add(activeMarker);
+  updateActiveMarker(1.0);
+
+  const bbox = new THREE.Box3().setFromBufferAttribute(pg.attributes.position);
+  controls.target.copy(bbox.getCenter(new THREE.Vector3()));
+  document.getElementById('frame_total').textContent = String(n - 1);
+}
+
+let frameUrls = null, frameIndices = null, preloadedImgs = [];
+
+function updatePlayerFrame(idx) {
+  if (!frameUrls || idx < 0 || idx >= frameUrls.length) return;
+  const host = document.getElementById('playerHost');
+  let img = document.getElementById('playerImg');
+  if (!img) { host.innerHTML = '<img id="playerImg" alt="frame" />'; img = document.getElementById('playerImg'); }
+  img.src = frameUrls[idx];
+  document.getElementById('pmCur').textContent = idx;
+  document.getElementById('pmOrig').textContent = frameIndices ? frameIndices[idx] : idx;
+}
+
+function resetPlayerToPlaceholder() {
+  frameUrls = null; frameIndices = null; preloadedImgs = [];
+  document.getElementById('playerHost').innerHTML = '<div class="ph">synthetic · no frames</div>';
+  document.getElementById('pmCur').textContent = '—';
+  document.getElementById('pmOrig').textContent = '—';
+}
+
+function updateActiveMarker(tNorm) {
+  if (!trajCoords || !activeMarker) return;
+  const idx = Math.min(trajCoords.length - 1, Math.floor(tNorm * (trajCoords.length - 1)));
+  const p = trajCoords[idx];
+  activeMarker.position.set(p[0], p[1], p[2]);
+  activeMarker.material.color.copy(gradient(idx / Math.max(trajCoords.length - 1, 1)));
+  document.getElementById('frame_idx').textContent = idx;
+  updatePlayerFrame(idx);
+}
+
+// ─── Raycaster click → frame picker ────────────────────────
+const raycaster = new THREE.Raycaster();
+raycaster.params.Points.threshold = 0.04;
+const mouseNdc = new THREE.Vector2();
+
+canvas.addEventListener('click', (e) => {
+  if (!pointsObj || !trajCoords) return;
+  const rect = canvas.getBoundingClientRect();
+  mouseNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouseNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouseNdc, camera);
+  const hits = raycaster.intersectObject(pointsObj);
+  if (!hits.length) return;
+  const idx = hits[0].index;
+  selectFrame(idx);
+});
+
+async function selectFrame(idx) {
+  // Set scrubber to that frame
+  setScrubFromIdx(idx);
+  // Open inspect tab
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('.tab[data-tab="inspect"]').classList.add('active');
+  document.querySelector('.tab-panel[data-panel="inspect"]').classList.add('active');
+  await renderInspector(idx);
+}
+
+async function renderInspector(idx) {
+  const empty = document.getElementById('inspectEmpty');
+  const focus = document.getElementById('inspectFocus');
+  if (!frameUrls && !videoCacheKey) {
+    empty.style.display = 'block'; focus.style.display = 'none';
+    empty.textContent = 'Synthetic system — no frames to inspect. Upload video to use this tool.';
+    return;
+  }
+  empty.style.display = 'none';
+  focus.style.display = 'block';
+  // Focused frame image
+  if (frameUrls && frameUrls[idx]) {
+    document.getElementById('focusImg').src = frameUrls[idx];
+    document.getElementById('focusMeta').textContent = `frame ${idx}` + (frameIndices ? ` · orig ${frameIndices[idx]}` : '');
+  }
+  // kNN fetch
+  if (!videoCacheKey) { document.getElementById('knnGrid').innerHTML = ''; return; }
+  try {
+    const r = await fetch(`/api/nearest/${videoCacheKey}?idx=${idx}&k=8`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const grid = document.getElementById('knnGrid');
+    grid.innerHTML = '';
+    for (const nb of d.neighbors) {
+      const cell = document.createElement('div');
+      cell.className = 'knn-cell';
+      const dist = nb.cosine_dist.toFixed(3);
+      cell.innerHTML = `
+        <img src="${frameUrls[nb.idx]}" alt="frame ${nb.idx}" />
+        <div class="meta"><span class="idx">#${nb.idx}</span> · d=${dist}</div>
+      `;
+      cell.addEventListener('click', () => selectFrame(nb.idx));
+      grid.appendChild(cell);
+    }
+  } catch (err) { setStatus('knn error: ' + err.message); }
+}
+
+// ─── Shot / event segmentation ─────────────────────────────
+const segSens = document.getElementById('segSens');
+const segMin = document.getElementById('segMin');
+segSens.addEventListener('input', () => document.getElementById('segSensVal').textContent = (segSens.value / 10).toFixed(1));
+segMin.addEventListener('input', () => document.getElementById('segMinVal').textContent = segMin.value);
+
+const SEG_COLORS = ['#00e5ff', '#ff2dd4', '#ffb400', '#00ff88', '#ff66cc', '#66ffcc', '#ffcc00', '#ff7766', '#a3ff66', '#66a3ff'];
+
+function renderSegmentTimeline(segments, totalN) {
+  const host = document.getElementById('segTimeline');
+  host.innerHTML = '';
+  for (let k = 0; k < segments.length; k++) {
+    const seg = segments[k];
+    const widthPct = (seg.length / totalN) * 100;
+    const div = document.createElement('div');
+    div.style.cssText = `
+      flex: ${seg.length}; min-width: 2px; background: ${SEG_COLORS[k % SEG_COLORS.length]};
+      opacity: 0.55; border-right: 1px solid #000;
+      transition: opacity 0.15s;
+    `;
+    div.title = `segment ${k}: ${seg.start}–${seg.end} · len=${seg.length} · μv=${seg.mean_velocity.toFixed(3)}`;
+    div.addEventListener('click', () => {
+      setScrubFromIdx(Math.floor((seg.start + seg.end) / 2));
+    });
+    div.addEventListener('mouseenter', () => div.style.opacity = '1');
+    div.addEventListener('mouseleave', () => div.style.opacity = '0.55');
+    host.appendChild(div);
+  }
+}
+
+function drawVelocityChart(velocity, threshold) {
+  const c = document.getElementById('velocityChart');
+  const W = c.width = c.clientWidth * 2;
+  const H = c.height = c.clientHeight * 2;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const n = velocity.length;
+  const vMax = Math.max(...velocity, threshold * 1.1, 1e-6);
+  // Threshold line
+  const tY = H - (threshold / vMax) * H * 0.85 - 10;
+  ctx.strokeStyle = 'rgba(255,180,0,0.5)';
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, tY); ctx.lineTo(W, tY); ctx.stroke();
+  ctx.setLineDash([]);
+  // Velocity line
+  ctx.strokeStyle = 'rgba(0,229,255,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * W;
+    const y = H - (velocity[i] / vMax) * H * 0.85 - 10;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // Peaks above threshold
+  ctx.fillStyle = 'rgba(255,45,212,0.9)';
+  for (let i = 0; i < n; i++) {
+    if (velocity[i] >= threshold) {
+      const x = (i / (n - 1)) * W;
+      const y = H - (velocity[i] / vMax) * H * 0.85 - 10;
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+// ─── Latent prediction / surprise ──────────────────────────
+document.getElementById('epochs').addEventListener('input', e => document.getElementById('epVal').textContent = e.target.value);
+document.getElementById('hidden').addEventListener('input', e => document.getElementById('hidVal').textContent = e.target.value);
+
+function drawSurpriseChart(surprise, baseline) {
+  const c = document.getElementById('surpriseChart');
+  const W = c.width = c.clientWidth * 2;
+  const H = c.height = c.clientHeight * 2;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const n = surprise.length;
+  const vMax = Math.max(Math.max(...surprise), Math.max(...baseline), 1e-6);
+  // Baseline line
+  ctx.strokeStyle = 'rgba(255,180,0,0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * W;
+    const y = H - (baseline[i] / vMax) * H * 0.85 - 10;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // MLP surprise line
+  ctx.strokeStyle = 'rgba(0,229,255,0.95)';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * W;
+    const y = H - (surprise[i] / vMax) * H * 0.85 - 10;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // Highlight top-5 surprise peaks
+  const ranked = [...surprise.keys()].sort((a, b) => surprise[b] - surprise[a]).slice(0, 5);
+  ctx.fillStyle = 'rgba(255,45,212,0.9)';
+  for (const i of ranked) {
+    const x = (i / (n - 1)) * W;
+    const y = H - (surprise[i] / vMax) * H * 0.85 - 10;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+document.getElementById('horizon').addEventListener('input', e => document.getElementById('horVal').textContent = e.target.value);
+document.getElementById('cfN').addEventListener('input', e => document.getElementById('cfNVal').textContent = e.target.value);
+document.getElementById('cfNoise').addEventListener('input', e => document.getElementById('cfNoiseVal').textContent = (e.target.value / 100).toFixed(2));
+
+document.getElementById('cfBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  const horizon = document.getElementById('horizon').value;
+  const nSamples = document.getElementById('cfN').value;
+  const noise = parseFloat(document.getElementById('cfNoise').value) / 100;
+  const startIdx = currentIdx();
+  setStatus(`imagining ${nSamples} futures from frame ${startIdx}…`, true);
+  try {
+    const r = await fetch(`/api/counterfactual/${videoCacheKey}?start_idx=${startIdx}&horizon=${horizon}&n_samples=${nSamples}&noise_scale=${noise}&epochs=100`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    drawCounterfactuals(d.rollouts, d.start_idx);
+    setStatus(`cone · ${d.n_samples} futures · h=${d.horizon} · σ=${d.noise_scale} · ${d.compute_s}s`);
+  } catch (err) { setStatus('cf error: ' + err.message); }
+});
+
+document.getElementById('rolloutBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  const horizon = document.getElementById('horizon').value;
+  const startIdx = currentIdx();
+  setStatus(`rollout · horizon=${horizon} from frame ${startIdx}…`, true);
+  try {
+    const r = await fetch(`/api/rollout/${videoCacheKey}?start_idx=${startIdx}&horizon=${horizon}&epochs=120`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    drawGhost(d.ghost_3d, d.start_idx);
+    const meanErr = d.step_errors.length ? d.step_errors.reduce((a,b)=>a+b,0)/d.step_errors.length : 0;
+    setStatus(`ghost · h=${d.horizon} · mean err=${meanErr.toFixed(2)} · ${d.compute_s}s`);
+  } catch (err) { setStatus('rollout error: ' + err.message); }
+});
+
+document.getElementById('predictBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  const epochs = document.getElementById('epochs').value;
+  const hidden = document.getElementById('hidden').value;
+  setStatus(`training predictor · ${epochs} epochs…`, true);
+  try {
+    const r = await fetch(`/api/predict/${videoCacheKey}?epochs=${epochs}&hidden=${hidden}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    surpriseVec = Float32Array.from(d.surprise);
+    surpriseMax = Math.max(...surpriseVec, 1e-9);
+    document.getElementById('predictResult').style.display = 'block';
+    document.getElementById('prPred').textContent = (d.predictability * 100).toFixed(1) + '%';
+    document.getElementById('prMean').textContent = d.mean_error.toFixed(3);
+    document.getElementById('prRatio').textContent = (d.mean_error / d.mean_baseline).toFixed(3);
+    document.getElementById('prLoss').textContent = d.final_loss.toFixed(4);
+    document.getElementById('prTime').textContent = `${d.compute_s}s`;
+    document.getElementById('prDev').textContent = d.device;
+    drawSurpriseChart(d.surprise, d.baseline_surprise);
+    document.getElementById('colorMode').value = 'surprise';
+    applyCurrentColorMode();
+    setStatus(`predictor trained · predictability=${(d.predictability * 100).toFixed(1)}%`);
+  } catch (err) { setStatus('predict error: ' + err.message); }
+});
+
+// ─── HDBSCAN clusters ─────────────────────────────────────
+document.getElementById('mcs').addEventListener('input', (e) => {
+  document.getElementById('mcsVal').textContent = e.target.value;
+});
+
+// Transition graph
+function drawTransitions(matrix, clusterIds, timePerCluster) {
+  const c = document.getElementById('transCanvas');
+  const W = c.width = c.clientWidth * 2;
+  const H = c.height = c.clientWidth * 2;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 60;
+  const n = clusterIds.length;
+  if (n === 0) return;
+  // Positions noeuds en cercle
+  const pos = clusterIds.map((_, i) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    return { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R };
+  });
+  // Max transition pour scaling
+  let maxT = 0;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    if (i !== j && matrix[i][j] > maxT) maxT = matrix[i][j];
+  }
+  if (maxT < 1) maxT = 1;
+  // Edges
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j || matrix[i][j] === 0) continue;
+      const w = matrix[i][j] / maxT;
+      if (w < 0.1) continue;
+      const palette = CLUSTER_PALETTE[clusterIds[i] % CLUSTER_PALETTE.length];
+      const rgb = `rgba(${Math.round(palette[0]*255)}, ${Math.round(palette[1]*255)}, ${Math.round(palette[2]*255)}, ${0.3 + 0.6 * w})`;
+      ctx.strokeStyle = rgb;
+      ctx.lineWidth = 1.5 + 8 * w;
+      const a = pos[i], b = pos[j];
+      const mx = (a.x + b.x) / 2 + (b.y - a.y) * 0.18;
+      const my = (a.y + b.y) / 2 - (b.x - a.x) * 0.18;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(mx, my, b.x, b.y);
+      ctx.stroke();
+      // Arrowhead
+      const ang = Math.atan2(b.y - my, b.x - mx);
+      ctx.fillStyle = rgb;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - 18 * Math.cos(ang - 0.3), b.y - 18 * Math.sin(ang - 0.3));
+      ctx.lineTo(b.x - 18 * Math.cos(ang + 0.3), b.y - 18 * Math.sin(ang + 0.3));
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // Nodes (size proportional to time spent)
+  const maxTime = Math.max(...timePerCluster, 1);
+  for (let i = 0; i < n; i++) {
+    const p = pos[i];
+    const r = 18 + 28 * (timePerCluster[i] / maxTime);
+    const palette = CLUSTER_PALETTE[clusterIds[i] % CLUSTER_PALETTE.length];
+    const rgb = `rgb(${Math.round(palette[0]*255)}, ${Math.round(palette[1]*255)}, ${Math.round(palette[2]*255)})`;
+    const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    grd.addColorStop(0, rgb);
+    grd.addColorStop(1, rgb.replace(')', ',0)').replace('rgb', 'rgba'));
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = `${Math.round(r * 0.7)}px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`#${clusterIds[i]}`, p.x, p.y);
+  }
+}
+
+document.getElementById('transBtn').addEventListener('click', async () => {
+  if (!clusterLabels) { setStatus('discover clusters first'); return; }
+  setStatus('computing transitions…', true);
+  try {
+    const r = await fetch(`/api/transitions/${videoCacheKey || 'x'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labels: clusterLabels }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('transCanvas').style.display = 'block';
+    document.getElementById('transCaption').style.display = 'block';
+    drawTransitions(d.matrix, d.cluster_ids, d.time_per_cluster);
+    setStatus(`transitions · ${d.total_transitions} edges · ${d.compute_s}s`);
+  } catch (err) { setStatus('trans error: ' + err.message); }
+});
+
+// CLIP cluster labeling
+document.getElementById('labelBtn').addEventListener('click', async () => {
+  if (!videoCacheKey || !clusterLabels) { setStatus('discover clusters first'); return; }
+  const vocab = document.getElementById('vocabInput').value.split('\n').map(s => s.trim()).filter(s => s);
+  if (!vocab.length) { setStatus('vocab empty'); return; }
+  setStatus(`labeling ${clusterData.n_clusters} clusters via CLIP…`, true);
+  try {
+    const r = await fetch(`/api/label_clusters/${videoCacheKey}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ labels: clusterLabels, vocab }),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const d = await r.json();
+    // Apply labels to existing cluster list rows
+    const list = document.getElementById('cluList');
+    const labelByCid = {};
+    for (const c of d.clusters) labelByCid[c.cluster_id] = c;
+    // Rebuild list with labels appended
+    list.innerHTML = '';
+    for (const c of clusterData.clusters) {
+      const palette = CLUSTER_PALETTE[c.id % CLUSTER_PALETTE.length];
+      const rgb = `rgb(${Math.round(palette[0]*255)}, ${Math.round(palette[1]*255)}, ${Math.round(palette[2]*255)})`;
+      const labelInfo = labelByCid[c.id];
+      const labelHtml = labelInfo
+        ? `<div style="color: var(--amber); font-size: 10px; margin-left: 20px; line-height: 1.4;">→ ${labelInfo.best_label} <span style="color: rgba(255,255,255,0.4);">(s=${labelInfo.best_sim.toFixed(3)})</span></div>`
+        : '';
+      const row = document.createElement('div');
+      row.style.cssText = 'padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;';
+      row.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px;">
+          <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${rgb}; box-shadow:0 0 6px ${rgb};"></span>
+          <span style="color: var(--cyan); width: 28px;">#${c.id}</span>
+          <span style="color: rgba(255,255,255,0.7); flex: 1;">size ${c.size}</span>
+          <span style="color: rgba(255,255,255,0.5); font-size: 9px;">[${c.time_span[0]}-${c.time_span[1]}]</span>
+        </div>
+        ${labelHtml}
+      `;
+      row.addEventListener('click', () => {
+        const mid = Math.floor((c.time_span[0] + c.time_span[1]) / 2);
+        setScrubFromIdx(mid);
+      });
+      list.appendChild(row);
+    }
+    setStatus(`labeled ${d.clusters.length} clusters`);
+  } catch (err) { setStatus('label error: ' + err.message); }
+});
+
+document.getElementById('clusterBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  const mcs = document.getElementById('mcs').value;
+  const metric = document.getElementById('hdbsMetric').value;
+  setStatus(`clustering · HDBSCAN…`, true);
+  try {
+    const r = await fetch(`/api/cluster/${videoCacheKey}?min_cluster_size=${mcs}&metric=${metric}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    clusterLabels = d.labels;
+    clusterData = d;
+    document.getElementById('clusterResult').style.display = 'block';
+    document.getElementById('cluN').textContent = d.n_clusters;
+    document.getElementById('cluNoise').textContent = d.n_noise;
+    document.getElementById('cluT').textContent = `${d.compute_s}s`;
+    const list = document.getElementById('cluList');
+    list.innerHTML = '';
+    for (const c of d.clusters) {
+      const palette = CLUSTER_PALETTE[c.id % CLUSTER_PALETTE.length];
+      const rgb = `rgb(${Math.round(palette[0]*255)}, ${Math.round(palette[1]*255)}, ${Math.round(palette[2]*255)})`;
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 4px 0; font-family: var(--mono); font-size: 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);';
+      row.innerHTML = `
+        <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${rgb}; box-shadow:0 0 6px ${rgb};"></span>
+        <span style="color: var(--cyan); width: 28px;">#${c.id}</span>
+        <span style="color: rgba(255,255,255,0.7); flex: 1;">size ${c.size}</span>
+        <span style="color: rgba(255,255,255,0.5); font-size: 9px;">[${c.time_span[0]}-${c.time_span[1]}]</span>
+        <span style="color: var(--plasma); font-size: 9px;">comp ${c.compactness.toFixed(2)}</span>
+      `;
+      row.addEventListener('click', () => {
+        // Jump au centre temporel du cluster
+        const mid = Math.floor((c.time_span[0] + c.time_span[1]) / 2);
+        setScrubFromIdx(mid);
+      });
+      list.appendChild(row);
+    }
+    // Auto-switch color mode to cluster
+    document.getElementById('colorMode').value = 'cluster';
+    applyCurrentColorMode();
+    setStatus(`${d.n_clusters} clusters · ${d.n_noise} noise · ${d.compute_s}s`);
+  } catch (err) { setStatus('cluster error: ' + err.message); }
+});
+
+document.getElementById('segBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) {
+    setStatus('upload video first');
+    return;
+  }
+  const method = document.getElementById('segMethod').value;
+  const sens = parseFloat(segSens.value) / 10;
+  const minSeg = parseInt(segMin.value);
+  setStatus(`detecting boundaries · ${method}…`, true);
+  try {
+    const qs = new URLSearchParams({ method, sensitivity: sens, min_segment: minSeg });
+    const r = await fetch(`/api/segments/${videoCacheKey}?${qs}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('segResult').style.display = 'block';
+    document.getElementById('segNB').textContent = d.n_boundaries;
+    document.getElementById('segNS').textContent = d.n_segments;
+    document.getElementById('segThr').textContent = d.threshold.toFixed(4);
+    renderSegmentTimeline(d.segments, d.velocity.length);
+    drawVelocityChart(d.velocity, d.threshold);
+    setStatus(`${d.n_segments} segments · ${d.n_boundaries} boundaries · ${d.compute_s}s`);
+  } catch (err) { setStatus('seg error: ' + err.message); }
+});
+
+// ─── CLIP text-image query ─────────────────────────────────
+let clipHighlightSims = null;  // similarity scores pour coloration
+
+function highlightClipMatches(sims) {
+  if (!pointsObj || !trajCoords) return;
+  clipHighlightSims = sims;
+  const n = trajCoords.length;
+  const colorsAttr = pointsObj.geometry.attributes.color;
+  const lineColorsAttr = lineObj?.geometry.attributes.color;
+  const sMin = Math.min(...sims);
+  const sMax = Math.max(...sims);
+  const span = Math.max(sMax - sMin, 1e-9);
+  for (let i = 0; i < n; i++) {
+    const t = (sims[i] - sMin) / span;
+    // Bleu sombre -> magenta -> plasma
+    const c = velocityColor(t);
+    colorsAttr.setXYZ(i, c.r, c.g, c.b);
+    if (lineColorsAttr) lineColorsAttr.setXYZ(i, c.r, c.g, c.b);
+  }
+  colorsAttr.needsUpdate = true;
+  if (lineColorsAttr) lineColorsAttr.needsUpdate = true;
+}
+
+document.getElementById('clipBtn').addEventListener('click', async () => {
+  const text = document.getElementById('clipQuery').value.trim();
+  if (!text) { setStatus('enter query text'); return; }
+  if (!videoCacheKey) { setStatus('upload video first (with clip_vit_b32)'); return; }
+  setStatus(`querying "${text}"…`, true);
+  try {
+    const r = await fetch(`/api/clip_query/${videoCacheKey}?text=${encodeURIComponent(text)}&top_k=8`);
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const d = await r.json();
+    // Affiche top matches
+    document.getElementById('clipResults').style.display = 'block';
+    const grid = document.getElementById('clipGrid');
+    grid.innerHTML = '';
+    for (const m of d.results) {
+      const cell = document.createElement('div');
+      cell.className = 'knn-cell';
+      cell.innerHTML = `<img src="${frameUrls?.[m.idx] || ''}" /><div class="meta"><span class="idx">#${m.idx}</span> · s=${m.similarity.toFixed(3)}</div>`;
+      cell.addEventListener('click', () => selectFrame(m.idx));
+      grid.appendChild(cell);
+    }
+    // Color trajectory by similarity
+    highlightClipMatches(d.similarities);
+    setStatus(`top match: #${d.results[0].idx} (s=${d.results[0].similarity.toFixed(3)})`);
+  } catch (err) { setStatus('clip error: ' + err.message); }
+});
+
+document.getElementById('clipQuery').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('clipBtn').click();
+});
+
+document.getElementById('clearFocusBtn').addEventListener('click', () => {
+  document.getElementById('inspectFocus').style.display = 'none';
+  document.getElementById('inspectEmpty').style.display = 'block';
+  document.getElementById('inspectEmpty').textContent = 'No frame selected. Clic on a point in 3D space.';
+});
+
+let tick = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  tick += 0.02;
+  if (activeMarker) activeMarker.scale.setScalar(1 + 0.18 * Math.sin(tick * 2.4));
+  controls.update();
+  composer.render();
+}
+animate();
+
+// ─── UI bindings ───────────────────────────────────────────
+const statusEl = document.getElementById('status');
+function setStatus(msg, pulsing = false) {
+  statusEl.textContent = msg;
+  statusEl.classList.toggle('pulse', pulsing);
+}
+
+function setStats(payload) {
+  const src = payload.name && payload.name.length > 28 ? payload.name.slice(0, 26) + '…' : (payload.name || '—');
+  document.getElementById('src').textContent = src;
+  document.getElementById('enc').textContent = payload.encoder || '—';
+  document.getElementById('ldim').textContent = payload.latent_dim ?? '—';
+  document.getElementById('npts').textContent = payload.n ?? '—';
+  document.getElementById('t_enc').textContent = payload.timings ? `${payload.timings.encode_s}s` : '—';
+  document.getElementById('t_red').textContent = payload.timings ? `${payload.timings.reduce_s}s` : '—';
+  // mirror dans tab Status
+  document.getElementById('m_src').textContent = src;
+  document.getElementById('m_encoder').textContent = payload.encoder || '—';
+  document.getElementById('m_ldim').textContent = payload.latent_dim ?? '—';
+  document.getElementById('m_npts').textContent = payload.n ?? '—';
+  document.getElementById('m_tenc').textContent = payload.timings ? `${payload.timings.encode_s}s` : '—';
+  document.getElementById('m_tred').textContent = payload.timings ? `${payload.timings.reduce_s}s` : '—';
+}
+
+document.getElementById('scrubber').addEventListener('input', (e) => {
+  currentT = e.target.value / 100;
+  updateActiveMarker(currentT);
+});
+
+function updateColorLegend() {
+  const mode = document.getElementById('colorMode').value;
+  const grad = document.getElementById('legendGrad');
+  const start = document.getElementById('legendStart');
+  const end = document.getElementById('legendEnd');
+  if (mode === 'time') {
+    grad.className = 'grad time';
+    start.textContent = 't=0'; start.style.color = 'var(--cyan)';
+    end.textContent = 't=N'; end.style.color = 'var(--amber)';
+  } else {
+    grad.className = 'grad velocity';
+    start.textContent = 'slow'; start.style.color = '#19b3ff';
+    end.textContent = 'fast'; end.style.color = '#ff2200';
+  }
+}
+
+function applyCurrentColorMode() {
+  updateVelStatsPanel();
+  updateColorLegend();
+  if (!pointsObj || !trajCoords) return;
+  const n = trajCoords.length;
+  const colorsAttr = pointsObj.geometry.attributes.color;
+  const lineColorsAttr = lineObj?.geometry.attributes.color;
+  for (let i = 0; i < n; i++) {
+    const c = pointColorFor(i, n);
+    colorsAttr.setXYZ(i, c.r, c.g, c.b);
+    if (lineColorsAttr) lineColorsAttr.setXYZ(i, c.r, c.g, c.b);
+  }
+  colorsAttr.needsUpdate = true;
+  if (lineColorsAttr) lineColorsAttr.needsUpdate = true;
+}
+document.getElementById('colorMode').addEventListener('change', applyCurrentColorMode);
+
+// View mode (representation temps)
+const VIEW_MODE_DESC = {
+  phase_space: 'Direct 3D : positions = UMAP/PCA coords, lignes = ordre temporel. Temps = parcours.',
+  time_helix: 'X-Y = 2 premiers axes du reducer, Z = temps linéaire [0..N]. Trajectoire devient helice. Récurrences visibles = positions X-Y alignées verticalement à différentes Z.',
+  takens_delay: 'Takens embedding : scalaire s = première composante. Phase space reconstruit via (s[t], s[t+τ], s[t+2τ]). Reveal attracteur depuis observable unique. τ tunable.',
+  polar_time: 'Coordonnees polaires : angle θ = temps mod 4π, rayon = ‖coord X-Y‖, Z = composante 3. Cycles visibles comme spirales.',
+  audio: 'Trajectoire AUDIO depuis features wav2vec2 (1s window per frame, 768d). Visualise dynamique sonore. Cross-modal compare avec trajectoire visuelle.',
+  sfa: 'Slow Feature Analysis (Wiskott-Sejnowski 2002). Extrait 3 axes les PLUS LENTS du signal latent = invariants temporels = identité persistante. Lambdas petits = signal stable. Lien direct emergence (composantes lentes émergent du substrat rapide).',
+};
+
+async function applyViewMode() {
+  const mode = document.getElementById('viewMode').value;
+  document.getElementById('viewModeDesc').textContent = VIEW_MODE_DESC[mode];
+  document.getElementById('tauField').style.display = mode === 'takens_delay' ? 'grid' : 'none';
+  if (mode === 'audio') {
+    if (!videoCacheKey) { setStatus('audio mode requires uploaded video'); return; }
+    setStatus('fetching audio trajectory…', true);
+    try {
+      const r = await fetch(`/api/audio/${videoCacheKey}`);
+      if (!r.ok) { setStatus('no audio in this video'); return; }
+      const d = await r.json();
+      buildTrajectory(d.coords);
+      applyCurrentColorMode();
+      setStatus(`audio trajectory · ${d.n} frames · ${d.audio_dim}d`);
+    } catch (err) { setStatus('audio error: ' + err.message); }
+    return;
+  }
+  if (mode === 'sfa') {
+    if (!videoCacheKey) { setStatus('SFA requires uploaded video'); return; }
+    setStatus('computing slow features…', true);
+    try {
+      const r = await fetch(`/api/sfa/${videoCacheKey}?n_components=3&polynomial_expand=1`, { method: 'POST' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      // Slow features = (N, 3) → utilise directement comme coords 3D
+      const coords = d.slow_features;
+      // Normalise [-1,1]
+      const mins = [Infinity, Infinity, Infinity];
+      const maxs = [-Infinity, -Infinity, -Infinity];
+      for (const p of coords) for (let j=0; j<3; j++) {
+        if (p[j] < mins[j]) mins[j] = p[j];
+        if (p[j] > maxs[j]) maxs[j] = p[j];
+      }
+      const normed = coords.map(p => p.map((v, j) => {
+        const span = Math.max(maxs[j] - mins[j], 1e-6);
+        return 2 * (v - mins[j]) / span - 1;
+      }));
+      buildTrajectory(normed);
+      applyCurrentColorMode();
+      const slows = d.slowness.map(s => s.toFixed(3)).join(' / ');
+      setStatus(`SFA · 3 slowest features · λ=${slows} · ${d.compute_s}s`);
+    } catch (err) { setStatus('sfa error: ' + err.message); }
+    return;
+  }
+  if (!originalCoords) return;
+  buildTrajectory(originalCoords);
+  applyCurrentColorMode();
+}
+
+document.getElementById('viewMode').addEventListener('change', applyViewMode);
+
+// Auto-tune embedding params
+document.getElementById('autotuneBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) {
+    setStatus('upload video first to auto-tune');
+    return;
+  }
+  const obj = document.getElementById('autotuneObj').value;
+  setStatus(`auto-tuning · ${obj}…`, true);
+  const resultEl = document.getElementById('autotuneResult');
+  resultEl.style.display = 'block';
+  resultEl.textContent = 'running 20 trials…';
+  try {
+    const method = document.getElementById('autotuneMethod').value;
+    const r = await fetch(`/api/autotune/${videoCacheKey}?objective=${obj}&n_trials=20&method=${method}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const b = d.best;
+    if (!b) { resultEl.textContent = 'no valid trial'; return; }
+    // Applique meilleurs params aux sliders
+    document.getElementById('paramNN').value = b.params.n_neighbors;
+    document.getElementById('paramMD').value = Math.round(b.params.min_dist * 100);
+    document.getElementById('paramSM').value = b.params.smoothing;
+    document.getElementById('paramMetric').value = b.params.metric;
+    document.getElementById('reducerSel').value = 'umap';
+    updateParamLabels();
+    // Affiche meilleurs scores
+    resultEl.innerHTML = `
+      <span style="color: var(--plasma); font-weight: 600;">best · obj=${b.objective.toFixed(3)}</span><br>
+      <span style="color: var(--cyan);">n_neighbors</span> = ${b.params.n_neighbors}<br>
+      <span style="color: var(--cyan);">min_dist</span> = ${b.params.min_dist}<br>
+      <span style="color: var(--cyan);">metric</span> = ${b.params.metric}<br>
+      <span style="color: var(--cyan);">smoothing</span> = ${b.params.smoothing}<br>
+      <span style="color: rgba(255,255,255,0.4);">faith=${b.scores.faithfulness.toFixed(3)} · cont=${b.scores.continuity_norm.toFixed(3)} · spread=${b.scores.spread.toFixed(3)}</span><br>
+      <span style="color: rgba(255,255,255,0.4);">${d.n_trials} trials · ${d.compute_s}s</span>
+    `;
+    // Re-projette avec meilleurs params
+    applyReducerParams();
+  } catch (err) {
+    resultEl.textContent = 'error: ' + err.message;
+    setStatus('autotune error: ' + err.message);
+  }
+});
+document.getElementById('paramTau').addEventListener('input', (e) => {
+  document.getElementById('tauVal').textContent = e.target.value;
+  if (document.getElementById('viewMode').value === 'takens_delay') applyViewMode();
+});
+
+// ─── Reducer + params live ─────────────────────────────────
+const nnSlider = document.getElementById('paramNN');
+const mdSlider = document.getElementById('paramMD');
+const smSlider = document.getElementById('paramSM');
+const metricSel = document.getElementById('paramMetric');
+
+function readParams() {
+  return {
+    reducer: document.getElementById('reducerSel').value,
+    n_neighbors: parseInt(nnSlider.value),
+    min_dist: parseFloat(mdSlider.value) / 100.0,
+    metric: metricSel.value,
+    smoothing: parseInt(smSlider.value),
+  };
+}
+
+function updateParamLabels() {
+  document.getElementById('nnVal').textContent = nnSlider.value;
+  document.getElementById('mdVal').textContent = (parseFloat(mdSlider.value) / 100).toFixed(2);
+  document.getElementById('smVal').textContent = smSlider.value;
+}
+
+function toggleParamsVisibility() {
+  const red = document.getElementById('reducerSel').value;
+  const section = document.getElementById('umapParamsSection');
+  // PCA n'utilise pas n_neighbors/min_dist/metric; cache section
+  section.style.opacity = (red === 'pca') ? '0.4' : '1';
+  document.getElementById('paramMetric').disabled = (red !== 'umap');
+  document.getElementById('paramMD').disabled = (red !== 'umap');
+}
+
+let reduceDebounceTimer = null;
+async function applyReducerParams() {
+  if (!videoCacheKey) {
+    setStatus(`params set · upload video to apply`);
+    return;
+  }
+  const p = readParams();
+  const qs = new URLSearchParams({
+    reducer: p.reducer,
+    n_neighbors: p.n_neighbors,
+    min_dist: p.min_dist,
+    metric: p.metric,
+    smoothing: p.smoothing,
+  });
+  setStatus(`re-projecting ${p.reducer}…`, true);
+  try {
+    const r = await fetch(`/api/reduce/${videoCacheKey}?${qs}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    buildTrajectory(d.coords);
+    updateAxisInfo('video', currentBundle.encoder, currentBundle.latent_dim, p.reducer);
+    if (currentBundle) currentBundle.reducer = p.reducer;
+    applyCurrentColorMode();
+    setStatus(`${p.reducer} · nn=${p.n_neighbors} md=${p.min_dist.toFixed(2)} sm=${p.smoothing} · ${d.compute_s}s`);
+  } catch (err) { setStatus('reduce error: ' + err.message); }
+}
+
+function debouncedReduce() {
+  clearTimeout(reduceDebounceTimer);
+  reduceDebounceTimer = setTimeout(applyReducerParams, 250);
+}
+
+[nnSlider, mdSlider, smSlider].forEach(s => s.addEventListener('input', () => {
+  updateParamLabels();
+  debouncedReduce();
+}));
+metricSel.addEventListener('change', debouncedReduce);
+document.getElementById('reducerSel').addEventListener('change', () => {
+  toggleParamsVisibility();
+  applyReducerParams();
+});
+toggleParamsVisibility();
+updateParamLabels();
+
+// Tabs
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.tab-panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+// Playback
+let playInterval = null;
+const playFps = 18;
+let loopPlayback = true;
+
+function setScrubFromIdx(idx) {
+  if (!trajCoords) return;
+  const n = trajCoords.length;
+  const t = Math.max(0, Math.min(n - 1, idx)) / Math.max(n - 1, 1);
+  currentT = t;
+  document.getElementById('scrubber').value = String(Math.round(t * 100));
+  updateActiveMarker(t);
+}
+function currentIdx() { return trajCoords ? Math.floor(currentT * (trajCoords.length - 1)) : 0; }
+
+document.getElementById('playNext').addEventListener('click', () => setScrubFromIdx(currentIdx() + 1));
+document.getElementById('playPrev').addEventListener('click', () => setScrubFromIdx(currentIdx() - 1));
+document.getElementById('playLoop').addEventListener('click', (e) => {
+  loopPlayback = !loopPlayback;
+  e.target.style.color = loopPlayback ? 'var(--plasma)' : 'rgba(255,255,255,0.4)';
+  e.target.style.borderColor = loopPlayback ? 'var(--plasma)' : 'rgba(255,255,255,0.2)';
+});
+document.getElementById('playPlay').addEventListener('click', (e) => {
+  if (playInterval) { clearInterval(playInterval); playInterval = null; e.target.textContent = '▶'; return; }
+  e.target.textContent = '⏸';
+  playInterval = setInterval(() => {
+    const i = currentIdx() + 1;
+    const n = trajCoords ? trajCoords.length : 0;
+    if (i >= n) {
+      if (loopPlayback) setScrubFromIdx(0);
+      else { clearInterval(playInterval); playInterval = null; e.target.textContent = '▶'; }
+    } else setScrubFromIdx(i);
+  }, 1000 / playFps);
+});
+
+// State
+let currentBundle = { source: 'lorenz', source_kind: 'system', encoder: 'synthetic' };
+let rawCoords = null, lorenzDt = 1.0, varNames = null;
+let videoCacheKey = null;  // pour re-reduce sans re-upload
+
+// ─── Axis labels semantics ─────────────────────────────────
+const SYSTEM_AXIS_INFO = {
+  lorenz: {
+    labels: ['x', 'y', 'z'],
+    desc: 'Variables d\'état de l\'ODE de Lorenz (x, y, z), normalisées dans [-1, 1]. Coords brutes accessibles pour SINDy via raw_coords.',
+  },
+  rossler: {
+    labels: ['x', 'y', 'z'],
+    desc: 'États ODE Rössler (x, y, z). z capture la sortie périodique du funnel.',
+  },
+  van_der_pol: {
+    labels: ['x', 'y', 'x(t−τ)'],
+    desc: 'État 2D (x, y) + embedding Takens 3e dim (x retardé de τ=12 pas). Limit cycle dépliée.',
+  },
+  henon: {
+    labels: ['x_n', 'y_n', 'x_{n−3}'],
+    desc: 'Map discrète Hénon 2D + Takens delay τ=3 pour visualiser attracteur étrange en 3D.',
+  },
+  logistic: {
+    labels: ['x_n', 'x_{n+1}', 'x_{n+2}'],
+    desc: 'Map 1D embeddée Takens (3 délais successifs). Révèle period-doubling cascade dans phase space reconstruit.',
+  },
+  double_pendulum: {
+    labels: ['θ₁', 'θ₂', 'ω₁'],
+    desc: 'Angles + vitesse angulaire bras 1. Espace phase 4D complet (θ₁,θ₂,ω₁,ω₂) projeté sur 3 dims.',
+  },
+};
+
+const REDUCER_AXIS = {
+  umap: {
+    labels: ['UMAP₁', 'UMAP₂', 'UMAP₃'],
+    desc: (e, d) => `Composantes UMAP 3D (cosine, n_neighbors=15) sur features ${e} (${d}d). Préserve voisinages locaux, distort distances. Trous entre points souvent = artefacts projection.`,
+  },
+  pca: {
+    labels: ['PC₁', 'PC₂', 'PC₃'],
+    desc: (e, d) => `3 premières composantes principales (variance max) des features ${e} (${d}d). Projection linéaire orthogonale = distances préservées proportionnellement. Frames proches en ${d}d restent proches en 3D.`,
+  },
+  isomap: {
+    labels: ['ISO₁', 'ISO₂', 'ISO₃'],
+    desc: (e, d) => `Isomap 3D (géodésique k-NN) sur features ${e} (${d}d). Préserve distances géodésiques sur manifold latent. Hybride linéaire/topologique.`,
+  },
+};
+
+function updateAxisInfo(kind, encoder, dim, reducer) {
+  let info;
+  if (kind === 'system') {
+    const sysId = document.getElementById('systemSel').value;
+    info = SYSTEM_AXIS_INFO[sysId] || { labels: ['x', 'y', 'z'], desc: 'unknown source' };
+  } else {
+    const r = REDUCER_AXIS[reducer || 'umap'] || REDUCER_AXIS.umap;
+    info = { labels: r.labels, desc: r.desc(encoder || 'encoder', dim || 'D') };
+  }
+  document.getElementById('ax_x').textContent = info.labels[0];
+  document.getElementById('ax_y').textContent = info.labels[1];
+  document.getElementById('ax_z').textContent = info.labels[2];
+  document.getElementById('axOvX').textContent = info.labels[0];
+  document.getElementById('axOvY').textContent = info.labels[1];
+  document.getElementById('axOvZ').textContent = info.labels[2];
+  document.getElementById('axesDescription').textContent = info.desc;
+}
+
+// Load system
+document.getElementById('demoBtn').addEventListener('click', async () => {
+  const sysId = document.getElementById('systemSel').value;
+  setStatus(`generating ${sysId}…`, true);
+  try {
+    const r = await fetch(`/api/v1/systems/${sysId}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    buildTrajectory(data.coords);
+    rawCoords = data.raw_coords || null;
+    lorenzDt = data.dt || 1.0;
+    varNames = data.var_names || null;
+    resetPlayerToPlaceholder();
+    perceptualVel = data.perceptual_velocity ? Float32Array.from(data.perceptual_velocity) : null;
+    perceptualMax = perceptualVel ? Math.max(...perceptualVel, 1e-9) : 1;
+    velocityMetricName = data.velocity_metric || 'phase_space_euclidean';
+    currentBundle = { source: data.name || sysId, source_kind: 'system', encoder: 'synthetic', system_meta: data.meta, var_names: data.var_names };
+    setStats({ ...data, encoder: 'synthetic' });
+    updateAxisInfo('system', 'synthetic', 3);
+    applyCurrentColorMode();
+    setStatus(`${data.name} loaded · ${data.type}`);
+  } catch (err) { setStatus('error: ' + err.message); }
+});
+
+// Video upload
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const enc = document.getElementById('encoderSel').value;
+  const maxF = document.getElementById('maxFrames').value;
+  const red = document.getElementById('reducerSel').value;
+  setStatus(`encoding ${f.name}…`, true);
+  const fd = new FormData();
+  fd.append('file', f);
+  try {
+    const r = await fetch(`/api/process?encoder=${enc}&max_frames=${maxF}&reducer=${red}`, { method: 'POST', body: fd });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    buildTrajectory(data.coords);
+    rawCoords = null; lorenzDt = 1.0; varNames = null;
+    frameUrls = data.frame_urls || null;
+    frameIndices = data.frame_indices || null;
+    if (frameUrls) {
+      preloadedImgs = frameUrls.map(u => { const im = new Image(); im.src = u; return im; });
+      updatePlayerFrame(frameUrls.length - 1);
+    } else resetPlayerToPlaceholder();
+    perceptualVel = data.perceptual_velocity ? Float32Array.from(data.perceptual_velocity) : null;
+    perceptualMax = perceptualVel ? Math.max(...perceptualVel, 1e-9) : 1;
+    velocityMetricName = data.velocity_metric || 'cosine_distance';
+    videoCacheKey = data.cache_key || null;
+    currentBundle = {
+      source: data.name || f.name, source_kind: 'video', encoder: data.encoder,
+      latent_dim: data.latent_dim, meta: data.meta, timings: data.timings,
+      frame_urls: data.frame_urls, frame_indices: data.frame_indices,
+      cache_key: data.cache_key, reducer: data.reducer,
+    };
+    setStats(data);
+    updateAxisInfo('video', data.encoder, data.latent_dim, data.reducer);
+    applyCurrentColorMode();
+    setStatus(`done · ${data.n} frames · ${enc} · ${data.reducer}`);
+  } catch (err) { setStatus('error: ' + err.message); }
+});
+
+// Health check
+fetch('/api/health').then(r => r.json()).then(h => {
+  document.getElementById('device').textContent = `device · ${h.device}`;
+});
+
+// ─── Live webcam capture loop ──────────────────────────────
+let liveStream = null;
+let liveVideo = null;
+let liveCanvas = null;
+let liveCtx = null;
+let liveSessionId = null;
+let liveInterval = null;
+let liveIntervalMs = 1500;
+
+async function startLive() {
+  const encoder = document.getElementById('encoderSel').value;
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: false });
+  } catch (err) { setStatus('webcam denied: ' + err.message); return; }
+  liveVideo = document.createElement('video');
+  liveVideo.srcObject = liveStream;
+  liveVideo.autoplay = true;
+  await liveVideo.play();
+  liveCanvas = document.createElement('canvas');
+  liveCanvas.width = 224; liveCanvas.height = 224;
+  liveCtx = liveCanvas.getContext('2d');
+
+  // Start session
+  const r = await fetch(`/api/live/start?encoder=${encoder}`, { method: 'POST' });
+  if (!r.ok) { setStatus('live start failed'); return; }
+  const sess = await r.json();
+  liveSessionId = sess.session_id;
+  videoCacheKey = null;  // disable cache-bound features
+  setStatus(`live · ${encoder} · session ${liveSessionId.slice(0,6)}…`, true);
+  document.getElementById('liveBtn').textContent = 'stop live ■';
+  document.getElementById('liveBtn').style.color = '#ff2200';
+  document.getElementById('liveBtn').style.borderColor = '#ff2200';
+
+  liveInterval = setInterval(captureLiveFrame, liveIntervalMs);
+}
+
+async function captureLiveFrame() {
+  if (!liveSessionId || !liveVideo) return;
+  // Draw video to 224 canvas
+  liveCtx.drawImage(liveVideo, 0, 0, 224, 224);
+  const blob = await new Promise(res => liveCanvas.toBlob(res, 'image/jpeg', 0.75));
+  if (!blob) return;
+  const fd = new FormData();
+  fd.append('file', blob, 'frame.jpg');
+  try {
+    const r = await fetch(`/api/live/frame/${liveSessionId}`, { method: 'POST', body: fd });
+    if (!r.ok) return;
+    const d = await r.json();
+    // Apply trajectory + frames
+    buildTrajectory(d.coords);
+    frameUrls = d.frame_urls;
+    frameIndices = null;
+    perceptualVel = d.perceptual_velocity ? Float32Array.from(d.perceptual_velocity) : null;
+    perceptualMax = perceptualVel ? Math.max(...perceptualVel, 1e-9) : 1;
+    velocityMetricName = d.velocity_metric || 'cosine_distance';
+    updatePlayerFrame(d.n - 1);
+    setScrubFromIdx(d.n - 1);
+    setStats({ name: `live · ${liveSessionId.slice(0,6)}`, n: d.n, encoder: d.encoder, latent_dim: d.latent_dim, timings: d.timings });
+    setStatus(`live · ${d.n} frames · enc ${d.timings.encode_s}s · red ${d.timings.reduce_s}s`, true);
+  } catch (err) { console.error('live frame error', err); }
+}
+
+async function stopLive() {
+  if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+  if (liveStream) { liveStream.getTracks().forEach(t => t.stop()); liveStream = null; }
+  if (liveSessionId) {
+    try { await fetch(`/api/live/stop/${liveSessionId}`, { method: 'POST' }); } catch {}
+    liveSessionId = null;
+  }
+  document.getElementById('liveBtn').textContent = 'live · webcam ●';
+  document.getElementById('liveBtn').style.color = '#ff66cc';
+  document.getElementById('liveBtn').style.borderColor = '#ff66cc';
+  setStatus('live stopped');
+}
+
+document.getElementById('liveBtn').addEventListener('click', () => {
+  if (liveSessionId) stopLive();
+  else startLive();
+});
+
+// ─── Analytics : Dynamics ──────────────────────────────────
+const recCanvas = document.getElementById('recCanvas');
+const recCtx = recCanvas.getContext('2d');
+
+function drawRecurrence(R) {
+  const n = R.length;
+  recCanvas.width = n; recCanvas.height = n;
+  const img = recCtx.createImageData(n, n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const v = R[i][j];
+      const idx = (i * n + j) * 4;
+      if (v) {
+        const dt = Math.abs(i - j) / n;
+        img.data[idx]     = Math.round(255 * dt);
+        img.data[idx + 1] = Math.round(40 + 180 * (1-dt));
+        img.data[idx + 2] = Math.round(220 - 100 * dt);
+        img.data[idx + 3] = 255;
+      } else img.data[idx + 3] = 0;
+    }
+  }
+  recCtx.putImageData(img, 0, 0);
+}
+
+async function computeDynamics() {
+  if (!trajCoords) { setStatus('no trajectory'); return; }
+  setStatus('computing dynamics…', true);
+  try {
+    const r = await fetch('/api/dynamics', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords: trajCoords }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('m_lyap').textContent = d.lyapunov.toFixed(4);
+    document.getElementById('m_d2').textContent = d.correlation_dim.toFixed(3);
+    document.getElementById('m_rr').textContent = d.rqa.RR.toFixed(3);
+    document.getElementById('m_det').textContent = d.rqa.DET.toFixed(3);
+    document.getElementById('m_lam').textContent = d.rqa.LAM.toFixed(3);
+    document.getElementById('m_eps').textContent = d.epsilon.toFixed(3);
+    drawRecurrence(d.recurrence);
+    setStatus(`dynamics · ${d.compute_s}s`);
+  } catch (err) { setStatus('dyn error: ' + err.message); }
+}
+document.getElementById('computeBtn').addEventListener('click', computeDynamics);
+
+// ─── Spectral ──────────────────────────────────────────────
+const koopCanvas = document.getElementById('koopmanCanvas');
+const koopCtx = koopCanvas.getContext('2d');
+
+function drawKoopman(eigRe, eigIm, amps) {
+  const W = koopCanvas.width = koopCanvas.clientWidth * 2;
+  const H = koopCanvas.height = koopCanvas.clientWidth * 2;
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 28;
+  koopCtx.clearRect(0, 0, W, H);
+  koopCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+  koopCtx.lineWidth = 1.5;
+  koopCtx.beginPath(); koopCtx.arc(cx, cy, R, 0, Math.PI * 2); koopCtx.stroke();
+  koopCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+  koopCtx.beginPath(); koopCtx.moveTo(0, cy); koopCtx.lineTo(W, cy);
+  koopCtx.moveTo(cx, 0); koopCtx.lineTo(cx, H); koopCtx.stroke();
+  const aMax = Math.max(...amps, 1e-9);
+  for (let i = 0; i < eigRe.length; i++) {
+    const x = cx + eigRe[i] * R, y = cy - eigIm[i] * R;
+    const a = amps[i] / aMax;
+    const radius = 4 + 10 * a;
+    const grd = koopCtx.createRadialGradient(x, y, 0, x, y, radius * 3);
+    grd.addColorStop(0, `rgba(0,255,136,${0.4 + 0.6 * a})`);
+    grd.addColorStop(1, 'rgba(0,255,136,0)');
+    koopCtx.fillStyle = grd;
+    koopCtx.beginPath(); koopCtx.arc(x, y, radius * 3, 0, Math.PI * 2); koopCtx.fill();
+    koopCtx.fillStyle = 'rgba(255,255,255,0.95)';
+    koopCtx.beginPath(); koopCtx.arc(x, y, radius * 0.6, 0, Math.PI * 2); koopCtx.fill();
+  }
+}
+
+function drawLadder(ladder) {
+  const host = document.getElementById('ladder');
+  host.innerHTML = '';
+  if (!ladder.length) return;
+  const hMax = Math.max(...ladder.map(r => r.entropy), 1e-6);
+  for (const row of ladder) {
+    const w = Math.max(2, Math.round((row.entropy / hMax) * 160));
+    const div = document.createElement('div');
+    div.className = 'bar-row';
+    div.innerHTML = `<span class="lbl">s=${row.scale}</span><span class="bar" style="width:${w}px;"></span><span class="val">${row.entropy.toFixed(2)}</span>`;
+    host.appendChild(div);
+  }
+}
+
+async function computeSpectral() {
+  if (!trajCoords) { setStatus('no trajectory'); return; }
+  setStatus('computing spectral…', true);
+  try {
+    const r = await fetch('/api/spectral', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords: trajCoords }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('s_rank').textContent = d.dmd.rank;
+    document.getElementById('s_modes').textContent = d.dmd.n_modes;
+    document.getElementById('s_slope').textContent = d.spectral_slope.toFixed(2);
+    drawKoopman(d.dmd.eigvals_re, d.dmd.eigvals_im, d.dmd.amplitudes);
+    drawLadder(d.multiscale.ladder);
+    setStatus(`spectral · ${d.compute_s}s`);
+  } catch (err) { setStatus('spec error: ' + err.message); }
+}
+document.getElementById('spectralBtn').addEventListener('click', computeSpectral);
+
+// ─── Causal ────────────────────────────────────────────────
+const causalCanvas = document.getElementById('causalCanvas');
+const causalCtx = causalCanvas.getContext('2d');
+
+function drawCausalGraph(labels, te) {
+  const W = causalCanvas.width = causalCanvas.clientWidth * 2;
+  const H = causalCanvas.height = causalCanvas.clientWidth * 2;
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 60;
+  causalCtx.clearRect(0, 0, W, H);
+  const n = labels.length;
+  const pos = labels.map((_, i) => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    return { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R };
+  });
+  let maxTe = 0;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) maxTe = Math.max(maxTe, te[i][j]);
+  if (maxTe < 1e-9) maxTe = 1;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    if (i === j) continue;
+    const w = te[i][j] / maxTe;
+    if (w < 0.08) continue;
+    const a = pos[i], b = pos[j];
+    causalCtx.strokeStyle = `rgba(255,180,0,${0.2 + 0.7 * w})`;
+    causalCtx.lineWidth = 1 + 5 * w;
+    const mx = (a.x + b.x) / 2 + (b.y - a.y) * 0.15;
+    const my = (a.y + b.y) / 2 - (b.x - a.x) * 0.15;
+    causalCtx.beginPath();
+    causalCtx.moveTo(a.x, a.y);
+    causalCtx.quadraticCurveTo(mx, my, b.x, b.y);
+    causalCtx.stroke();
+    const ang = Math.atan2(b.y - my, b.x - mx);
+    causalCtx.fillStyle = `rgba(255,180,0,${0.5 + 0.5 * w})`;
+    causalCtx.beginPath();
+    causalCtx.moveTo(b.x, b.y);
+    causalCtx.lineTo(b.x - 16 * Math.cos(ang - 0.35), b.y - 16 * Math.sin(ang - 0.35));
+    causalCtx.lineTo(b.x - 16 * Math.cos(ang + 0.35), b.y - 16 * Math.sin(ang + 0.35));
+    causalCtx.closePath(); causalCtx.fill();
+  }
+  for (let i = 0; i < n; i++) {
+    const p = pos[i];
+    const grd = causalCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 28);
+    grd.addColorStop(0, 'rgba(0,229,255,1)'); grd.addColorStop(1, 'rgba(0,229,255,0)');
+    causalCtx.fillStyle = grd;
+    causalCtx.beginPath(); causalCtx.arc(p.x, p.y, 28, 0, Math.PI * 2); causalCtx.fill();
+    causalCtx.fillStyle = '#fff';
+    causalCtx.font = '18px "JetBrains Mono", monospace';
+    causalCtx.textAlign = 'center'; causalCtx.textBaseline = 'middle';
+    causalCtx.fillText(labels[i], p.x, p.y);
+  }
+}
+
+async function computeCausal() {
+  if (!trajCoords) { setStatus('no trajectory'); return; }
+  setStatus('computing causal…', true);
+  try {
+    const r = await fetch('/api/causal', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords: trajCoords }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    drawCausalGraph(d.labels, d.transfer_entropy);
+    setStatus(`causal · ${d.compute_s}s`);
+  } catch (err) { setStatus('causal error: ' + err.message); }
+}
+document.getElementById('causalBtn').addEventListener('click', computeCausal);
+
+// ─── Topology ──────────────────────────────────────────────
+const persistCanvas = document.getElementById('persistCanvas');
+const persistCtx = persistCanvas.getContext('2d');
+
+function drawPersistence(diagrams) {
+  const W = persistCanvas.width = persistCanvas.clientWidth * 2;
+  const H = persistCanvas.height = persistCanvas.clientWidth * 2;
+  const pad = 24;
+  persistCtx.clearRect(0, 0, W, H);
+  let maxV = 0;
+  for (const d of diagrams) for (const [b, e] of d.pairs) maxV = Math.max(maxV, b, e);
+  if (maxV <= 0) maxV = 1;
+  const toPx = (v) => pad + (v / maxV) * (W - 2 * pad);
+  persistCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+  persistCtx.lineWidth = 1.5;
+  persistCtx.beginPath();
+  persistCtx.moveTo(pad, H - pad);
+  persistCtx.lineTo(W - pad, pad);
+  persistCtx.stroke();
+  const colors = ['rgba(0,229,255,', 'rgba(255,45,212,', 'rgba(0,255,136,'];
+  for (const d of diagrams) {
+    const c = colors[d.dim] || 'rgba(255,255,255,';
+    for (const [b, e] of d.pairs) {
+      const persistence = e - b;
+      const a = Math.min(1, 0.3 + persistence / maxV * 2);
+      const x = toPx(b), y = H - toPx(e);
+      persistCtx.fillStyle = c + a + ')';
+      persistCtx.beginPath();
+      persistCtx.arc(x, y, 4 + Math.min(6, persistence / maxV * 12), 0, Math.PI * 2);
+      persistCtx.fill();
+    }
+  }
+  persistCtx.font = '16px "JetBrains Mono", monospace';
+  persistCtx.fillStyle = 'rgba(0,229,255,0.9)'; persistCtx.fillText('H0', pad, pad + 14);
+  persistCtx.fillStyle = 'rgba(255,45,212,0.9)'; persistCtx.fillText('H1', pad + 44, pad + 14);
+}
+
+async function computeTopology() {
+  if (!trajCoords) { setStatus('no trajectory'); return; }
+  setStatus('computing topology…', true);
+  try {
+    const r = await fetch('/api/topology', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords: trajCoords }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    drawPersistence(d.global.diagrams);
+    document.getElementById('t_h0').textContent = d.global.diagrams[0].count;
+    document.getElementById('t_h1').textContent = d.global.diagrams[1] ? d.global.diagrams[1].count : 0;
+    document.getElementById('t_eh0').textContent = d.global.persistence_entropy.H0.toFixed(2);
+    document.getElementById('t_eh1').textContent = (d.global.persistence_entropy.H1 ?? 0).toFixed(2);
+    document.getElementById('t_win').textContent = d.sliding.n_windows;
+    setStatus(`topology · ${d.compute_s}s`);
+  } catch (err) { setStatus('topo error: ' + err.message); }
+}
+document.getElementById('topoBtn').addEventListener('click', computeTopology);
+
+// ─── SINDy + Emergence ─────────────────────────────────────
+function renderSindyEquations(equations) {
+  const host = document.getElementById('sindyEqs');
+  host.innerHTML = '';
+  for (const eq of equations) {
+    const div = document.createElement('div');
+    div.className = 'sindy-eq';
+    let html = `<span class="lhs">${eq.lhs}</span> = `;
+    if (!eq.terms.length) html += '<span style="color:rgba(255,255,255,0.3);">0</span>';
+    else eq.terms.forEach((t, i) => {
+      const sign = t.coef >= 0 ? '+' : '−';
+      const cls = t.coef >= 0 ? 'coef-pos' : 'coef-neg';
+      const val = Math.abs(t.coef).toFixed(3);
+      if (i > 0 || t.coef < 0) html += `<span class="${cls}"> ${sign} </span>`;
+      html += `<span class="${cls}">${val}</span>`;
+      if (t.term !== '1') html += `·<span class="term">${t.term}</span>`;
+    });
+    div.innerHTML = html;
+    host.appendChild(div);
+  }
+}
+
+function renderEmergenceLadder(ladder) {
+  const host = document.getElementById('emergenceLadder');
+  host.innerHTML = '';
+  if (!ladder.length) return;
+  const eis = ladder.map(r => r.ei);
+  const eiMax = Math.max(...eis, 1e-6);
+  for (const row of ladder) {
+    const w = Math.max(2, Math.round((row.ei / eiMax) * 140));
+    const div = document.createElement('div');
+    div.className = 'bar-row';
+    const gainColor = row.gain > 0.02 ? 'var(--plasma)' : 'rgba(255,255,255,0.4)';
+    div.innerHTML = `<span class="lbl">s=${row.scale}</span>
+                     <span class="ebar" style="width:${w}px;"></span>
+                     <span style="color:var(--cyan); width:54px;">EI=${row.ei.toFixed(2)}</span>
+                     <span style="color:${gainColor}; width:58px;">Δ=${row.gain >= 0 ? '+' : ''}${row.gain.toFixed(2)}</span>`;
+    host.appendChild(div);
+  }
+}
+
+async function computeSindyEmergence() {
+  if (!trajCoords) { setStatus('no trajectory'); return; }
+  setStatus('discovering equations…', true);
+  const useRaw = rawCoords && rawCoords.length > 0;
+  const coordsForSindy = useRaw ? rawCoords : trajCoords;
+  const dt = useRaw ? lorenzDt : 1.0;
+  const names = useRaw && varNames ? varNames : null;
+  const threshold = useRaw ? 0.5 : 0.04;
+  try {
+    const [rSindy, rEmerge] = await Promise.all([
+      fetch('/api/sindy', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coords: coordsForSindy, dt, order: 2, threshold, var_names: names }) }),
+      fetch('/api/emergence', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coords: trajCoords }) }),
+    ]);
+    if (!rSindy.ok) throw new Error(`SINDy HTTP ${rSindy.status}`);
+    if (!rEmerge.ok) throw new Error(`Emerge HTTP ${rEmerge.status}`);
+    const sd = await rSindy.json();
+    const em = await rEmerge.json();
+    renderSindyEquations(sd.equations);
+    document.getElementById('s_r2').textContent = sd.r2.toFixed(3);
+    document.getElementById('s_active').textContent = `${sd.n_active}/${sd.n_terms_lib}`;
+    document.getElementById('s_order').textContent = sd.order;
+    document.getElementById('s_time').textContent = `${sd.compute_s}s`;
+    document.getElementById('phi_id').textContent = em.phi_id_approx.toFixed(3);
+    document.getElementById('phi_scale').textContent = em.optimal_scale;
+    document.getElementById('ei_micro').textContent = em.ei_micro.toFixed(3);
+    renderEmergenceLadder(em.ladder);
+    setStatus(`SINDy R²=${sd.r2.toFixed(3)} · φ_id=${em.phi_id_approx.toFixed(3)}`);
+  } catch (err) { setStatus('sindy error: ' + err.message); }
+}
+document.getElementById('sindyBtn').addEventListener('click', computeSindyEmergence);
+
+// ─── Save / export / history ───────────────────────────────
+function snapshotMetrics() {
+  const get = (id) => document.getElementById(id)?.textContent ?? null;
+  return {
+    dynamics: { lyapunov: get('m_lyap'), corr_dim: get('m_d2'), rr: get('m_rr'), det: get('m_det'), lam: get('m_lam'), epsilon: get('m_eps') },
+    spectral: { rank: get('s_rank'), modes: get('s_modes'), slope: get('s_slope') },
+    topology: { h0: get('t_h0'), h1: get('t_h1'), h0_entropy: get('t_eh0'), h1_entropy: get('t_eh1'), windows: get('t_win') },
+    sindy: { r2: get('s_r2'), active: get('s_active'), order: get('s_order'), time: get('s_time') },
+    emergence: { phi_id: get('phi_id'), optimal_scale: get('phi_scale'), ei_micro: get('ei_micro') },
+  };
+}
+
+function downloadJson(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!trajCoords) { setStatus('nothing to export'); return; }
+  const bundle = {
+    ...currentBundle, n: trajCoords.length, coords: trajCoords, raw_coords: rawCoords,
+    dt: lorenzDt, var_names: varNames, metrics: snapshotMetrics(),
+    exported_at: new Date().toISOString(),
+  };
+  const safeName = (currentBundle.source || 'run').replace(/[^\w-]+/g, '_');
+  downloadJson(`dynamoscope_${safeName}_${Date.now()}.json`, bundle);
+  setStatus('bundle exported');
+});
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  if (!trajCoords) { setStatus('nothing to save'); return; }
+  const payload = {
+    ...currentBundle, n: trajCoords.length, coords: trajCoords, raw_coords: rawCoords,
+    dt: lorenzDt, var_names: varNames, metrics: snapshotMetrics(),
+  };
+  try {
+    const r = await fetch('/api/v1/experiments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: currentBundle.source || 'unknown',
+        source_kind: currentBundle.source_kind || 'system',
+        encoder: currentBundle.encoder || null, payload, tags: [],
+      }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    setStatus(`saved · ${d.id}`);
+  } catch (err) { setStatus('save error: ' + err.message); }
+});
+
+async function refreshHistory() {
+  try {
+    const r = await fetch('/api/v1/experiments?limit=30');
+    const d = await r.json();
+    const host = document.getElementById('histList');
+    host.innerHTML = '';
+    if (!d.experiments.length) {
+      host.innerHTML = '<div style="color:rgba(255,255,255,0.35); padding:16px; text-align:center;">no runs yet</div>';
+      return;
+    }
+    for (const exp of d.experiments) {
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+      const date = new Date(exp.created_at * 1000).toISOString().slice(5, 16).replace('T', ' ');
+      row.innerHTML = `
+        <div style="flex:1; min-width:0;">
+          <div class="lbl" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${exp.source}</div>
+          <div class="meta">${date} · ${exp.source_kind} · ${exp.encoder || '—'} · n=${exp.n_points}</div>
+        </div>
+        <span class="del" data-id="${exp.id}">×</span>
+      `;
+      row.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('del')) return;
+        document.getElementById('histPanel').classList.remove('open');
+        if (histPickMode === 'compare') {
+          // Charge payload pour récupérer cache_key
+          const r2 = await fetch(`/api/v1/experiments/${exp.id}`);
+          const payload = await r2.json();
+          const secondKey = payload.cache_key || (payload.frame_urls && payload.frame_urls[0] && payload.frame_urls[0].split('/')[2]);
+          if (!secondKey) { setStatus('cache_key missing in saved run'); return; }
+          await compareWithSecond(secondKey);
+          histPickMode = 'load';
+        } else {
+          await loadExperiment(exp.id);
+        }
+      });
+      row.querySelector('.del').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await fetch(`/api/v1/experiments/${exp.id}`, { method: 'DELETE' });
+        refreshHistory();
+      });
+      host.appendChild(row);
+    }
+  } catch (err) { setStatus('history error: ' + err.message); }
+}
+
+async function loadExperiment(expId) {
+  setStatus(`loading ${expId}…`, true);
+  try {
+    const r = await fetch(`/api/v1/experiments/${expId}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    buildTrajectory(d.coords);
+    rawCoords = d.raw_coords || null;
+    lorenzDt = d.dt || 1.0;
+    varNames = d.var_names || null;
+    frameUrls = d.frame_urls || null;
+    frameIndices = d.frame_indices || null;
+    if (frameUrls) {
+      preloadedImgs = frameUrls.map(u => { const im = new Image(); im.src = u; return im; });
+      updatePlayerFrame(frameUrls.length - 1);
+    } else resetPlayerToPlaceholder();
+    currentBundle = { source: d.source, source_kind: d.source_kind, encoder: d.encoder };
+    setStats({ name: d.source, n: d.n, encoder: d.encoder, latent_dim: d.latent_dim ?? '—', timings: d.timings });
+    updateAxisInfo(d.source_kind, d.encoder, d.latent_dim);
+    setStatus(`loaded ${d.source}`);
+  } catch (err) { setStatus('load error: ' + err.message); }
+}
+
+document.getElementById('histToggle').addEventListener('click', () => {
+  const p = document.getElementById('histPanel');
+  p.classList.add('open');
+  histPickMode = 'load';
+  refreshHistory();
+});
+
+let histPickMode = 'load';  // 'load' or 'compare'
+
+document.getElementById('compareBtn').addEventListener('click', () => {
+  if (!videoCacheKey) { setStatus('upload primary video first'); return; }
+  histPickMode = 'compare';
+  document.getElementById('histPanel').classList.add('open');
+  refreshHistory();
+  setStatus('select second video to overlay');
+});
+
+document.getElementById('clearOverlayBtn').addEventListener('click', () => {
+  clearOverlay();
+  document.getElementById('clearOverlayBtn').style.display = 'none';
+  setStatus('overlay cleared');
+});
+
+async function compareWithSecond(secondCacheKey) {
+  if (!videoCacheKey || !secondCacheKey) return;
+  setStatus('fitting shared UMAP…', true);
+  try {
+    const r = await fetch(`/api/compare?key1=${videoCacheKey}&key2=${secondCacheKey}&reducer=umap`);
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const d = await r.json();
+    // Rebuild primary trajectory with shared UMAP coords_a
+    buildTrajectory(d.coords_a);
+    applyCurrentColorMode();
+    // Overlay secondary
+    drawOverlay(d.coords_b, 0.45);
+    document.getElementById('clearOverlayBtn').style.display = 'block';
+    setStatus(`overlay · pair_dist=${d.mean_pair_distance.toFixed(2)} · centroid_dist=${d.centroid_distance.toFixed(2)} · ${d.compute_s}s`);
+  } catch (err) { setStatus('compare error: ' + err.message); }
+}
+document.getElementById('histClose').addEventListener('click', () => {
+  document.getElementById('histPanel').classList.remove('open');
+});
+document.getElementById('histPanel').addEventListener('click', (e) => {
+  if (e.target.id === 'histPanel') document.getElementById('histPanel').classList.remove('open');
+});
+
+// ─── Evolution sliding window ──────────────────────────────
+document.getElementById('evWin').addEventListener('input', e => document.getElementById('evWinVal').textContent = e.target.value);
+document.getElementById('evStr').addEventListener('input', e => document.getElementById('evStrVal').textContent = e.target.value);
+
+function drawEvolutionChart(centers, metrics) {
+  const c = document.getElementById('evChart');
+  const W = c.width = c.clientWidth * 2;
+  const H = c.height = c.clientHeight * 2;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const pad = 20;
+  // Normalise chaque metric en [0,1] indépendamment
+  const colors = {
+    velocity: 'rgba(0,229,255,0.95)',
+    local_dim: 'rgba(255,45,212,0.95)',
+    n_clusters: 'rgba(255,180,0,0.95)',
+    predictability: 'rgba(0,255,136,0.95)',
+  };
+  const keys = ['velocity', 'local_dim', 'n_clusters', 'predictability'];
+  const xMin = centers[0], xMax = centers[centers.length - 1];
+  const xSpan = Math.max(xMax - xMin, 1);
+  for (const k of keys) {
+    const arr = metrics[k];
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+    const span = Math.max(max - min, 1e-9);
+    ctx.strokeStyle = colors[k];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < centers.length; i++) {
+      const x = pad + ((centers[i] - xMin) / xSpan) * (W - 2 * pad);
+      const y = H - pad - ((arr[i] - min) / span) * (H - 2 * pad);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // Points
+    ctx.fillStyle = colors[k];
+    for (let i = 0; i < centers.length; i++) {
+      const x = pad + ((centers[i] - xMin) / xSpan) * (W - 2 * pad);
+      const y = H - pad - ((arr[i] - min) / span) * (H - 2 * pad);
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // Grid + axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, H - pad); ctx.lineTo(W - pad, H - pad);
+  ctx.moveTo(pad, pad); ctx.lineTo(pad, H - pad);
+  ctx.stroke();
+}
+
+document.getElementById('evBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  const win = document.getElementById('evWin').value;
+  const str = document.getElementById('evStr').value;
+  setStatus(`computing evolution · window=${win}…`, true);
+  try {
+    const r = await fetch(`/api/evolution/${videoCacheKey}?window=${win}&stride=${str}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('evResult').style.display = 'block';
+    document.getElementById('evN').textContent = d.n_windows;
+    document.getElementById('evT').textContent = `${d.compute_s}s`;
+    drawEvolutionChart(d.centers, d.metrics);
+    setStatus(`evolution · ${d.n_windows} windows · ${d.compute_s}s`);
+  } catch (err) { setStatus('evolution error: ' + err.message); }
+});
+
+// ─── Video DNA radar ───────────────────────────────────────
+function drawDNARadar(axes) {
+  const c = document.getElementById('dnaRadar');
+  const W = c.width = c.clientWidth * 2;
+  const H = c.height = c.clientWidth * 2;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 50;
+  const keys = Object.keys(axes);
+  const N = keys.length;
+  // Grid
+  for (let r = 0.25; r <= 1.0; r += 0.25) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.08 + r * 0.1})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(a) * R * r;
+      const y = cy + Math.sin(a) * R * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  // Axes lines
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    ctx.stroke();
+  }
+  // Polygon de valeurs
+  const pts = keys.map((k, i) => {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    const v = axes[k];
+    return [cx + Math.cos(a) * R * v, cy + Math.sin(a) * R * v];
+  });
+  ctx.fillStyle = 'rgba(0,255,136,0.18)';
+  ctx.strokeStyle = 'rgba(0,255,136,0.95)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Points + labels
+  ctx.font = `${Math.round(W / 50)}px "JetBrains Mono", monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    const lx = cx + Math.cos(a) * (R + 24);
+    const ly = cy + Math.sin(a) * (R + 24);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(keys[i], lx, ly);
+    ctx.fillStyle = 'rgba(0,255,136,0.7)';
+    ctx.fillText(axes[keys[i]].toFixed(2), lx, ly + Math.round(W / 50) + 2);
+    const [px, py] = pts[i];
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+document.getElementById('dnaBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  setStatus('computing DNA…', true);
+  try {
+    const r = await fetch(`/api/dna/${videoCacheKey}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('dnaResult').style.display = 'block';
+    document.getElementById('dnaScore').textContent = d.composite_score.toFixed(1);
+    document.getElementById('dnaLabel').textContent = d.label;
+    drawDNARadar(d.axes);
+    const raw = document.getElementById('dnaRaw');
+    raw.innerHTML = '';
+    for (const [k, v] of Object.entries(d.raw_metrics)) {
+      raw.innerHTML += `<span class="k">${k}</span><span class="v">${typeof v === 'number' ? v.toFixed(3) : v}</span>`;
+    }
+    setStatus(`DNA · ${d.composite_score.toFixed(1)}/100 · ${d.label}`);
+  } catch (err) { setStatus('dna error: ' + err.message); }
+});
+
+// ─── HTML report builder ───────────────────────────────────
+function canvasSnapshot(id, fallback = null) {
+  const c = document.getElementById(id);
+  if (!c || c.width === 0) return fallback;
+  try { return c.toDataURL('image/png'); } catch { return fallback; }
+}
+
+function buildReportHTML() {
+  const get = (id) => document.getElementById(id)?.textContent ?? '—';
+  const sceneSnap = renderer.domElement.toDataURL('image/png');
+  const recSnap = canvasSnapshot('recCanvas');
+  const koopSnap = canvasSnapshot('koopmanCanvas');
+  const causalSnap = canvasSnapshot('causalCanvas');
+  const persistSnap = canvasSnapshot('persistCanvas');
+  const surpriseSnap = canvasSnapshot('surpriseChart');
+  const velSnap = canvasSnapshot('velocityChart');
+  const sindyEqsHTML = document.getElementById('sindyEqs')?.innerHTML || '—';
+  const cluListHTML = document.getElementById('cluList')?.innerHTML || '—';
+  const ladderHTML = document.getElementById('ladder')?.innerHTML || '—';
+  const emergenceHTML = document.getElementById('emergenceLadder')?.innerHTML || '—';
+  const segTimelineHTML = document.getElementById('segTimeline')?.innerHTML || '—';
+  const axesDesc = document.getElementById('axesDescription')?.textContent || '—';
+
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const html = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><title>Dynamoscope Report · ${get('m_src')}</title>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #07070b; color: #e8e8e8; margin: 0; padding: 40px 60px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-family: 'JetBrains Mono', monospace; font-size: 24px; letter-spacing: 0.18em; color: #00e5ff; border-bottom: 1px solid rgba(0,229,255,0.3); padding-bottom: 12px; }
+  h2 { font-family: 'JetBrains Mono', monospace; font-size: 14px; letter-spacing: 0.22em; color: #ff2dd4; margin-top: 32px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin: 16px 0; font-family: monospace; font-size: 12px; }
+  .meta .k { color: rgba(255,255,255,0.55); }
+  .meta .v { color: #00ff88; }
+  .row { display: flex; gap: 20px; align-items: flex-start; margin: 16px 0; }
+  .col { flex: 1; }
+  img.snap { max-width: 100%; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: #000; }
+  .interp { background: rgba(0,229,255,0.04); border-left: 2px solid #00e5ff; padding: 12px 16px; margin: 12px 0; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+  .stat-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; font-family: monospace; font-size: 12px; }
+  .stat-grid .k { color: rgba(255,255,255,0.55); }
+  .stat-grid .v { color: #00ff88; text-align: right; }
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 0.18em; }
+  .sindy-eq { padding: 4px 0; font-family: monospace; font-size: 13px; color: rgba(255,255,255,0.92); }
+  .sindy-eq .lhs { color: #00e5ff; }
+  .sindy-eq .coef-pos { color: #00ff88; }
+  .sindy-eq .coef-neg { color: #ff2dd4; }
+  .sindy-eq .term { color: #ffb400; }
+  .bar-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-family: monospace; font-size: 10px; }
+  .bar { height: 8px; background: linear-gradient(90deg, #00e5ff, #ff2dd4); border-radius: 1px; }
+  .ebar { height: 7px; background: linear-gradient(90deg, #00ff88, #00e5ff); border-radius: 1px; }
+</style></head>
+<body>
+
+<h1>DYNAMOSCOPE · ${get('m_src')}</h1>
+
+<div class="meta">
+  <div><span class="k">source</span><br><span class="v">${get('m_src')}</span></div>
+  <div><span class="k">encoder</span><br><span class="v">${get('m_encoder')}</span></div>
+  <div><span class="k">latent dim</span><br><span class="v">${get('m_ldim')}</span></div>
+  <div><span class="k">points</span><br><span class="v">${get('m_npts')}</span></div>
+  <div><span class="k">encode time</span><br><span class="v">${get('m_tenc')}</span></div>
+  <div><span class="k">reduce time</span><br><span class="v">${get('m_tred')}</span></div>
+</div>
+
+<h2>PHASE-SPACE TRAJECTORY</h2>
+<img src="${sceneSnap}" class="snap" />
+<div class="interp">${axesDesc}</div>
+
+<h2>DYNAMICS · LYAPUNOV · RQA</h2>
+<div class="row">
+  <div class="col">
+    <div class="stat-grid">
+      <span class="k">λ (Lyapunov)</span><span class="v">${get('m_lyap')}</span>
+      <span class="k">correlation dim</span><span class="v">${get('m_d2')}</span>
+      <span class="k">RR</span><span class="v">${get('m_rr')}</span>
+      <span class="k">DET</span><span class="v">${get('m_det')}</span>
+      <span class="k">LAM</span><span class="v">${get('m_lam')}</span>
+      <span class="k">ε</span><span class="v">${get('m_eps')}</span>
+    </div>
+  </div>
+  <div class="col">${recSnap ? `<img src="${recSnap}" class="snap" />` : ''}</div>
+</div>
+
+<h2>SPECTRAL · KOOPMAN · MULTISCALE</h2>
+<div class="row">
+  <div class="col">
+    <div class="stat-grid">
+      <span class="k">rank</span><span class="v">${get('s_rank')}</span>
+      <span class="k">modes</span><span class="v">${get('s_modes')}</span>
+      <span class="k">spectral slope</span><span class="v">${get('s_slope')}</span>
+    </div>
+    <div style="margin-top: 12px;">${ladderHTML}</div>
+  </div>
+  <div class="col">${koopSnap ? `<img src="${koopSnap}" class="snap" />` : ''}</div>
+</div>
+
+<h2>CAUSAL · TRANSFER ENTROPY</h2>
+${causalSnap ? `<img src="${causalSnap}" class="snap" style="max-width: 400px;" />` : '—'}
+
+<h2>TOPOLOGY · PERSISTENT HOMOLOGY</h2>
+<div class="row">
+  <div class="col">
+    <div class="stat-grid">
+      <span class="k">H0 cycles</span><span class="v">${get('t_h0')}</span>
+      <span class="k">H1 cycles</span><span class="v">${get('t_h1')}</span>
+      <span class="k">H0 entropy</span><span class="v">${get('t_eh0')}</span>
+      <span class="k">H1 entropy</span><span class="v">${get('t_eh1')}</span>
+      <span class="k">sliding windows</span><span class="v">${get('t_win')}</span>
+    </div>
+  </div>
+  <div class="col">${persistSnap ? `<img src="${persistSnap}" class="snap" />` : ''}</div>
+</div>
+
+<h2>SINDy · DISCOVERED EQUATIONS</h2>
+<div>${sindyEqsHTML}</div>
+<div class="stat-grid" style="margin-top: 12px;">
+  <span class="k">R²</span><span class="v">${get('s_r2')}</span>
+  <span class="k">active terms</span><span class="v">${get('s_active')}</span>
+  <span class="k">order</span><span class="v">${get('s_order')}</span>
+  <span class="k">compute</span><span class="v">${get('s_time')}</span>
+</div>
+
+<h2>EMERGENCE · φ-id</h2>
+<div class="stat-grid">
+  <span class="k">φ_id approx</span><span class="v">${get('phi_id')}</span>
+  <span class="k">optimal scale</span><span class="v">${get('phi_scale')}</span>
+  <span class="k">EI micro</span><span class="v">${get('ei_micro')}</span>
+</div>
+<div style="margin-top: 8px;">${emergenceHTML}</div>
+
+<h2>PREDICTION · SURPRISE</h2>
+<div class="row">
+  <div class="col">
+    <div class="stat-grid">
+      <span class="k">predictability</span><span class="v">${get('prPred')}</span>
+      <span class="k">mean error</span><span class="v">${get('prMean')}</span>
+      <span class="k">vs baseline</span><span class="v">${get('prRatio')}</span>
+      <span class="k">final loss</span><span class="v">${get('prLoss')}</span>
+    </div>
+  </div>
+  <div class="col">${surpriseSnap ? `<img src="${surpriseSnap}" class="snap" />` : ''}</div>
+</div>
+
+<h2>SEGMENTS · SHOT BOUNDARIES</h2>
+<div class="stat-grid">
+  <span class="k">boundaries</span><span class="v">${get('segNB')}</span>
+  <span class="k">segments</span><span class="v">${get('segNS')}</span>
+  <span class="k">threshold</span><span class="v">${get('segThr')}</span>
+</div>
+<div style="margin-top: 8px; height: 28px; display: flex;">${segTimelineHTML}</div>
+${velSnap ? `<img src="${velSnap}" class="snap" style="margin-top: 8px;" />` : ''}
+
+<h2>CLUSTERS · HDBSCAN</h2>
+<div class="stat-grid">
+  <span class="k">n_clusters</span><span class="v">${get('cluN')}</span>
+  <span class="k">noise frames</span><span class="v">${get('cluNoise')}</span>
+</div>
+<div style="margin-top: 8px;">${cluListHTML}</div>
+
+<div class="footer">
+  generated · ${new Date().toISOString()} · DYNAMOSCOPE v0.6 · video → latent trajectory → emergence
+</div>
+
+</body></html>`;
+  return { html, ts };
+}
+
+document.getElementById('reportBtn').addEventListener('click', () => {
+  if (!trajCoords) { setStatus('no trajectory to report'); return; }
+  setStatus('generating report…', true);
+  try {
+    const { html, ts } = buildReportHTML();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (currentBundle.source || 'run').replace(/[^\w-]+/g, '_');
+    a.href = url; a.download = `dynamoscope_report_${safeName}_${ts}.html`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    setStatus('report exported');
+  } catch (err) { setStatus('report error: ' + err.message); }
+});
+
+// ─── Run all + auto-pipeline ───────────────────────────────
+async function runAll() {
+  await computeDynamics();
+  await computeSpectral();
+  await computeCausal();
+  await computeTopology();
+  await computeSindyEmergence();
+}
+document.getElementById('runAllBtn').addEventListener('click', runAll);
+
+// Auto-load demo on startup
+setTimeout(() => {
+  document.getElementById('demoBtn').click();
+  setTimeout(runAll, 1000);
+}, 300);
+</script>
+</body>
+</html>
