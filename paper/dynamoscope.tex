@@ -1193,19 +1193,56 @@ the smallest lag, opposite to the intuition that smoothing causes
 delay. Mean lag-ratio per window-halving is $1.11$, far from the
 predicted $2.0$.
 
-Two hypotheses falsified leaves a residual explanation : the
-detection lag is dominated by the \emph{response curve} of the
-\texttt{convergence\_rate} metric itself. The metric is positive in
-the spiral-in fixed-point regime, near zero in the limit-cycle
-regime, and crosses zero gradually as $\mu$ grows from negative to
-positive. Its maximum first-difference along the $\mu$-axis falls
-near $\mu \approx 0.5$ regardless of window size or pixel
-resolution. The binding constraint is therefore the metric's own
-$\mu$-sensitivity, not spatial or temporal analysis parameters.
-A potentially sharper detector would use a metric whose response to
-the cycle's emergence is steeper near $\mu=0$, e.g.\ $L_\text{max}/N$
-or RQA $\text{DET}$, which jump as soon as recurrence diagonals form.
-We do not test that here but list it as a clear next-experiment.
+A third hypothesis is that the lag is set by the
+\texttt{convergence\_rate} metric's specific $\mu$-response curve,
+and that a sharper-response metric ($L_{\max}/N$, RQA DET,
+correlation dimension, or Lyapunov estimate) would detect the
+transition earlier.
+
+We tested this by re-running the change-point detection on the same
+sliding-window analysis using each of four metrics independently.
+
+\begin{table}[h]
+\centering
+\caption{Metric sweep. All four metrics give virtually identical
+detection.}
+\label{tab:metric-sweep}
+\begin{tabular}{lrr}
+\toprule
+Metric & Lag (frames) & $\mu_{\text{vis}}$ \\
+\midrule
+\texttt{convergence\_rate} & $+110$ & $+0.553$ \\
+\texttt{correlation\_dim} & $+110$ & $+0.553$ \\
+\texttt{max\_diag\_ratio} ($L_{\max}/N$) & $+115$ & $+0.578$ \\
+\texttt{lyapunov} & $+120$ & $+0.603$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Hypothesis~3 is also falsified : all four metrics produce lags within
+$10$ frames of one another and $\mu_{\text{vis}}$ within $0.05$. The
+metric choice is not the binding constraint either.
+
+\paragraph{Synthesis of three falsifications.}
+The detection lag of $\approx 100$--$120$ frames ($\mu_{\text{vis}}
+\approx 0.5$) is robust across spatial resolution ($64$, $128$,
+$256$ px), temporal window ($15$, $30$, $60$, $120$ frames), and
+diagnostic metric (four different invariants). No single dimension
+explains it. The most parsimonious remaining explanation is that the
+rendered video itself loses information near $\mu=0$ : a Van der Pol
+limit cycle of radius $\sqrt{\mu}\approx 0.1$--$0.3$ at small $\mu$
+traces a region narrower than the trail of the playhead dot, so the
+\emph{visual} signal we extract observables from cannot distinguish it
+from a stationary point. This is not a spatial-pixel-resolution issue
+in the strict sense (our resolution sweep falsifies that), but rather
+an interaction between trail rendering width, the per-frame
+classical observable computation, and the metric thresholds, none of
+which dominate independently but which together produce a robust
+$\mu_{\text{vis}} \approx 0.5$ floor. A genuinely different signal
+representation --- multi-scale wavelet pre-processing of the trail,
+or replacing the trail rendering by an analytic phase-space
+projection --- would be required to push $\mu_{\text{vis}}$ below this
+floor. We list this as concrete future work.
 
 The regime-kind transitions reported by the classical pipelines (e.g.\
 \texttt{cycle} $\to$ \texttt{strange} for \texttt{delay\_entropy} at

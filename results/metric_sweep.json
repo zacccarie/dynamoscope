@@ -1,0 +1,50 @@
+{
+  "rows": [
+    {
+      "metric": "convergence_rate",
+      "cp_frame": 210,
+      "mu_vis": 0.5526315789473684,
+      "lag_frames": 110,
+      "v_low_mu": -0.0371,
+      "v_high_mu": 0.13931999999999997,
+      "delta_total": 0.17641999999999997
+    },
+    {
+      "metric": "max_diag_ratio",
+      "cp_frame": 215,
+      "mu_vis": 0.5776942355889725,
+      "lag_frames": 115,
+      "v_low_mu": 0.4444,
+      "v_high_mu": 0.0722,
+      "delta_total": -0.37220000000000003
+    },
+    {
+      "metric": "lyapunov",
+      "cp_frame": 220,
+      "mu_vis": 0.6027568922305764,
+      "lag_frames": 120,
+      "v_low_mu": 0.06141999999999999,
+      "v_high_mu": 0.12955999999999998,
+      "delta_total": 0.06813999999999999
+    },
+    {
+      "metric": "correlation_dim",
+      "cp_frame": 210,
+      "mu_vis": 0.5526315789473684,
+      "lag_frames": 110,
+      "v_low_mu": 5.546200000000001,
+      "v_high_mu": 1.9746,
+      "delta_total": -3.571600000000001
+    }
+  ],
+  "model": "delay_entropy_auto_m3",
+  "gt_frame": 100,
+  "configs": {
+    "size": 128,
+    "window": 40,
+    "stride": 5,
+    "n_frames": 400,
+    "mu_start": -0.5,
+    "mu_end": 1.5
+  }
+}
