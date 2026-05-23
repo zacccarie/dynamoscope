@@ -321,6 +321,19 @@ of histogrammed latent dimensions across temporal coarse-grainings
 $s \in \{1,2,4,8,16,32\}$) and a power-law spectral slope obtained
 from log--log fitting of $|\text{FFT}(z)|^2$.
 
+\paragraph{Wavelet decomposition.} For each latent dimension we
+optionally compute a Discrete Wavelet Transform (DWT) via
+PyWavelets, with a choice of mother wavelets (Daubechies-4 by
+default, Haar, Symlet-8, Coiflet-5). The energy per scale
+$E_j = \sum_k |cD_{j,k}|^2$ summarizes the temporal multi-scale
+structure: a dominant fine scale indicates rapid oscillations,
+while energy concentrated at coarse scales suggests slow modulation.
+This is complementary to DMD (frequency-domain) and entropy ladder
+(distribution-shape) signatures. A proper Mallat scattering
+network~\cite{mallat2012scattering} would yield Lipschitz-stable
+translation-invariance; we view the DWT decomposition as a
+lightweight surrogate.
+
 \subsection{Causality}
 
 We provide three complementary tests pairwise on the dominant
@@ -575,17 +588,19 @@ a sliding-stride variant would help.
 
 \subsection{Future work}
 
-Beyond the current VideoMAE integration, several directions are
-planned: V-JEPA~\cite{bardes2024vjepa} for long-horizon motion-aware
-features; neural ODE / SDE fits to the latent trajectory to obtain
-smooth parametric flows; differentiable parametric
-UMAP~\cite{sainburg2021parametric} so that the projection can be
-optimized jointly with downstream losses; multi-video comparison
-through a learned shared embedding; a streaming variant of
-persistent homology (\emph{vineyards}); wavelet scattering networks
-\`a la Mallat for translation-invariant multi-scale features; and a
-richer cross-modal analysis with text and language-model embeddings
-as additional modalities.
+Several directions remain open: V-JEPA~\cite{bardes2024vjepa} for
+long-horizon motion-aware features; neural ODE / SDE fits to the
+latent trajectory to obtain smooth parametric flows; differentiable
+parametric UMAP~\cite{sainburg2021parametric} so that the projection
+can be optimized jointly with downstream losses; multi-video
+comparison through a learned shared embedding; a streaming variant
+of persistent homology (\emph{vineyards}); proper Mallat wavelet
+scattering networks~\cite{mallat2012scattering} for true
+Lipschitz-stable translation-invariance (our current implementation
+uses the simpler Discrete Wavelet Transform via PyWavelets, which
+provides per-scale energy decomposition but not the deep
+scattering hierarchy); and a richer cross-modal analysis with text
+and language-model embeddings as additional modalities.
 
 \section{Conclusion}
 
@@ -776,6 +791,10 @@ representation learning. \emph{Meta AI Technical Report}.
 Sainburg, T., McInnes, L., \& Gentner, T. Q. (2021). Parametric UMAP
 embeddings for representation and semi-supervised learning.
 \emph{Neural Computation}, 33(11), 2881--2907.
+
+\bibitem{mallat2012scattering}
+Mallat, S. (2012). Group invariant scattering. \emph{Communications
+on Pure and Applied Mathematics}, 65(10), 1331--1398.
 
 \end{thebibliography}
 

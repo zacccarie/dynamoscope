@@ -12,6 +12,7 @@ from backend.evolution import evolution_pipeline
 from backend.dna import compute_dna, _clip01
 from backend.systems import lorenz, rossler, henon, van_der_pol, double_pendulum, logistic_map, list_systems
 from backend.autotune import composite_score, random_search
+from backend.wavelets import wavelet_decompose, wavelet_per_dim
 
 
 def test_transition_mi_returns_scalar(fake_latents_2048):
@@ -112,6 +113,33 @@ def test_list_systems_returns_six():
     assert len(systems) == 6
     ids = {s["id"] for s in systems}
     assert {"lorenz", "rossler", "henon", "logistic", "van_der_pol", "double_pendulum"} == ids
+
+
+def test_wavelet_decompose_returns_levels():
+    """DWT 1D produit n_levels + approximation + détails."""
+    series = np.sin(np.linspace(0, 10*np.pi, 256))
+    out = wavelet_decompose(series, wavelet="db4")
+    assert out["n_levels"] >= 3
+    assert len(out["energy_per_scale"]) == out["n_levels"]
+    assert out["dominant_scale"] >= 1
+
+
+def test_wavelet_per_dim_energy_sums(fake_latents_2048):
+    """Energy normalized somme à 1 (au seuil numérique)."""
+    out = wavelet_per_dim(fake_latents_2048[:128])
+    s = sum(out["energy_normalized"])
+    assert 0.99 < s < 1.01
+
+
+def test_wavelet_dominant_scale_periodic():
+    """Signal sinusoïdal pure → dominant scale corresponds à période."""
+    n = 512
+    period = 32  # cycle every 32 samples
+    series = np.sin(2 * np.pi * np.arange(n) / period)
+    out = wavelet_decompose(series, wavelet="db4")
+    # dominant scale doit être dans la zone correspondant à la période
+    # (pas trop strict car DWT discrétise par puissances 2)
+    assert out["dominant_scale"] >= 2
 
 
 def test_composite_score_decomposition(fake_latents_2048, lorenz_traj):
