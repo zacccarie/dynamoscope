@@ -1,0 +1,45 @@
+{
+  "rows": [
+    {
+      "window": 15,
+      "cp_frame": 197,
+      "mu_vis": 0.48746867167919794,
+      "lag_frames": 97,
+      "n_windows": 78,
+      "compute_s": 0.6
+    },
+    {
+      "window": 30,
+      "cp_frame": 215,
+      "mu_vis": 0.5776942355889725,
+      "lag_frames": 115,
+      "n_windows": 75,
+      "compute_s": 1.1
+    },
+    {
+      "window": 60,
+      "cp_frame": 200,
+      "mu_vis": 0.5025062656641603,
+      "lag_frames": 100,
+      "n_windows": 69,
+      "compute_s": 2.0
+    },
+    {
+      "window": 120,
+      "cp_frame": 175,
+      "mu_vis": 0.3771929824561403,
+      "lag_frames": 75,
+      "n_windows": 57,
+      "compute_s": 3.3
+    }
+  ],
+  "model": "delay_entropy_auto_m3",
+  "gt_frame": 100,
+  "configs": {
+    "size": 128,
+    "n_frames": 400,
+    "stride": 5,
+    "mu_start": -0.5,
+    "mu_end": 1.5
+  }
+}

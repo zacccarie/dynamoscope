@@ -1163,18 +1163,49 @@ predicted $4.0$. The Heisenberg hypothesis is therefore
 \emph{falsified} at the resolution range we tested. The detection limit
 is not set by spatial pixel count.
 
-The most plausible alternative explanation is that the binding
-constraints come from the temporal-analysis side of the pipeline:
-(a) the $40$-frame sliding window smooths sub-window dynamics;
-(b) the regime classifier uses fixed empirical thresholds
-($\text{TH}_{\text{noise-diag}}=0.045$,
-$\text{TH}_{\text{regular-diag}}=0.65$,
-$\text{TH}_{\text{converge-rel}}=0.55$); and
-(c) the classical observable pipeline (luminance histogram entropy on
-$32$ bins, delay embedding on a one-dimensional series, RQA on
-$\sim$ embedding distances) is largely invariant to pixel count once
-features are computed. Lowering the detection lag would require
-adjusting these temporal/feature parameters, not the spatial render.
+A second hypothesis is that the lag is set by the sliding-window
+size : a $40$-frame analysis window smooths sub-window dynamics, so
+shrinking the window should reduce the lag proportionally.
+
+We tested this by sweeping $\text{WINDOW} \in \{15, 30, 60, 120\}$
+with $\text{SIZE}=128$ and all other parameters fixed.
+
+\begin{table}[h]
+\centering
+\caption{Window sweep. Detection lag is approximately
+window-invariant.}
+\label{tab:window-sweep}
+\begin{tabular}{rrr}
+\toprule
+Window (frames) & Lag (frames) & $\mu_{\text{vis}}$ \\
+\midrule
+15 & $+97$ & $+0.487$ \\
+30 & $+115$ & $+0.578$ \\
+60 & $+100$ & $+0.503$ \\
+120 & $+75$ & $+0.377$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The window hypothesis is also \emph{falsified}: lag does not scale
+with window size, and in fact the largest window (120 frames) yields
+the smallest lag, opposite to the intuition that smoothing causes
+delay. Mean lag-ratio per window-halving is $1.11$, far from the
+predicted $2.0$.
+
+Two hypotheses falsified leaves a residual explanation : the
+detection lag is dominated by the \emph{response curve} of the
+\texttt{convergence\_rate} metric itself. The metric is positive in
+the spiral-in fixed-point regime, near zero in the limit-cycle
+regime, and crosses zero gradually as $\mu$ grows from negative to
+positive. Its maximum first-difference along the $\mu$-axis falls
+near $\mu \approx 0.5$ regardless of window size or pixel
+resolution. The binding constraint is therefore the metric's own
+$\mu$-sensitivity, not spatial or temporal analysis parameters.
+A potentially sharper detector would use a metric whose response to
+the cycle's emergence is steeper near $\mu=0$, e.g.\ $L_\text{max}/N$
+or RQA $\text{DET}$, which jump as soon as recurrence diagonals form.
+We do not test that here but list it as a clear next-experiment.
 
 The regime-kind transitions reported by the classical pipelines (e.g.\
 \texttt{cycle} $\to$ \texttt{strange} for \texttt{delay\_entropy} at
