@@ -360,7 +360,7 @@
       </div>
       <div class="field">
         <label>method</label>
-        <select id="autotuneMethod">
+        <select id="autotuneMethod" title="Méthode optimisation UMAP. Bayesian = gp_minimize avec acquisition EI.">
           <option value="bayesian">Bayesian opt · GP-EI (faster convergence)</option>
           <option value="random">random search · uniform</option>
         </select>
@@ -369,8 +369,8 @@
       <div id="autotuneResult" style="font-size: 9px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-top: 8px; display: none;"></div>
     </div>
     <label class="filebtn" style="display:block;">
-      <input type="file" id="fileInput" accept="video/*" />
-      <button onclick="document.getElementById('fileInput').click()">upload video</button>
+      <input type="file" id="fileInput" accept="video/*" title="Charge vidéo locale (.mp4/.mov/.avi)" />
+      <button onclick="document.getElementById('fileInput').click()" title="Upload vidéo → extraction frames → encoding → reduction 3D + métriques">upload video</button>
     </label>
     <button id="liveBtn" style="margin-top:6px; color:#ff66cc; border-color:#ff66cc;" title="Active webcam : encode chaque frame en live (1.5s interval), trajectoire grandit en temps réel.">live · webcam ●</button>
   </div>
@@ -477,19 +477,20 @@
 <!-- ─── RIGHT SIDEBAR : analysis tabs ──────────────────────── -->
 <div class="sidebar right">
   <div class="tabs" role="tablist">
-    <button class="tab active" data-tab="dynamics">dynamics</button>
-    <button class="tab" data-tab="spectral">spectral</button>
-    <button class="tab" data-tab="causal">causal</button>
-    <button class="tab" data-tab="topology">topology</button>
-    <button class="tab" data-tab="sindy">SINDy · φ</button>
-    <button class="tab" data-tab="phase">phase-space</button>
-    <button class="tab" data-tab="inspect">inspect</button>
-    <button class="tab" data-tab="segments">segments</button>
-    <button class="tab" data-tab="clusters">clusters</button>
-    <button class="tab" data-tab="predict">predict</button>
-    <button class="tab" data-tab="dna">DNA</button>
-    <button class="tab" data-tab="evolution">evolution</button>
-    <button class="tab" data-tab="status">status</button>
+    <button class="tab active" data-tab="dynamics" title="Lyapunov exponent + RQA + correlation dimension + matrice récurrence">dynamics</button>
+    <button class="tab" data-tab="spectral" title="DMD modes + spectre puissance + exposant scaling">spectral</button>
+    <button class="tab" data-tab="causal" title="Granger + Transfer Entropy + PCMCI+ causal graph">causal</button>
+    <button class="tab" data-tab="topology" title="Persistent homology H0/H1/H2 + entropie">topology</button>
+    <button class="tab" data-tab="sindy" title="Sparse equation discovery + emergence index φ_id">SINDy · φ</button>
+    <button class="tab" data-tab="phase" title="Pipeline classique : 12 observables pixel → Takens delay → trajectoire + verdict régime">phase-space</button>
+    <button class="tab" data-tab="inspect" title="Frame k-NN inspector — pick frame, see closest in latent space">inspect</button>
+    <button class="tab" data-tab="segments" title="Shot boundaries detection via velocity peaks">segments</button>
+    <button class="tab" data-tab="clusters" title="HDBSCAN clustering trajectoire + CLIP labels">clusters</button>
+    <button class="tab" data-tab="predict" title="Trajectory prediction + rollout + counterfactual">predict</button>
+    <button class="tab" data-tab="dna" title="DNA composite score 8 axes + classification">DNA</button>
+    <button class="tab" data-tab="evolution" title="Sliding window evolution of metrics through video">evolution</button>
+    <button class="tab" data-tab="status" title="Run metadata + pipeline status + 'run all analyses'">status</button>
+    <button class="tab" data-tab="help" title="Guide d'utilisation + glossaire complet métriques/algos/encoders/viz">help</button>
   </div>
 
   <!-- Dynamics -->
@@ -590,24 +591,24 @@
     <div class="form-row" style="margin-bottom: 10px;">
       <label style="font-size: 10px; color: var(--cyan); display:block; margin-bottom: 4px;">MODE</label>
       <div style="display:flex; gap: 4px;">
-        <button class="phase-mode active" data-mode="delay" style="flex:1; font-size: 10px; padding: 6px;">Délai</button>
-        <button class="phase-mode" data-mode="pca" style="flex:1; font-size: 10px; padding: 6px;">PCA</button>
-        <button class="phase-mode" data-mode="direct" style="flex:1; font-size: 10px; padding: 6px;">Direct</button>
+        <button class="phase-mode active" data-mode="delay" title="Takens delay embedding sur 1 observable scalaire. Reconstruit attracteur via [s(t), s(t+τ), ..., s(t+(m-1)τ)]. Théorème Takens 1981." style="flex:1; font-size: 10px; padding: 6px;">Délai</button>
+        <button class="phase-mode" data-mode="pca" title="PCA sur K observables → m components principales. Linéaire, déterministe." style="flex:1; font-size: 10px; padding: 6px;">PCA</button>
+        <button class="phase-mode" data-mode="direct" title="Pick K observables directement comme axes. Interpretation immédiate (ex: X=brightness, Y=motion, Z=entropy)." style="flex:1; font-size: 10px; padding: 6px;">Direct</button>
       </div>
     </div>
 
     <div id="phaseDelayGrp">
       <div class="form-row" style="margin-bottom: 8px;">
         <label for="phaseObs" style="font-size: 10px; color: var(--cyan);">OBSERVABLE s(t)</label>
-        <select id="phaseObs" style="width: 100%;"></select>
+        <select id="phaseObs" title="Observable scalaire utilisée pour Takens delay. Notre observable sweep (§8.1) montre 230× spread de sensibilité — flowY détecte Hopf à +5f, meanR à +235f." style="width: 100%;"></select>
       </div>
       <div class="form-row" style="margin-bottom: 8px;">
         <label style="font-size: 10px; color: var(--cyan); display:flex; justify-content:space-between;">
           <span>DÉLAI τ</span><span id="phaseTauVal">auto</span>
         </label>
         <div style="display:flex; gap:4px; align-items:center;">
-          <input id="phaseTau" type="range" min="1" max="60" value="0" step="1" style="flex:1;">
-          <button id="phaseTauAuto" class="btn-mini" style="font-size: 9px; padding: 4px 8px;">auto</button>
+          <input id="phaseTau" type="range" min="1" max="60" value="0" step="1" title="Délai τ pour Takens. 0 = auto (premier min |autocorrelation|). Trop petit = corrélation triviale, trop grand = saturation." style="flex:1;">
+          <button id="phaseTauAuto" class="btn-mini" title="Auto-tau via premier minimum local de |autocorrelation| de la série d'observable." style="font-size: 9px; padding: 4px 8px;">auto</button>
         </div>
       </div>
     </div>
@@ -615,15 +616,15 @@
     <div id="phaseDirectGrp" hidden>
       <div class="form-row" style="margin-bottom: 6px;">
         <label style="font-size: 10px; color: var(--cyan);">AXE X</label>
-        <select id="phaseAxX" style="width: 100%;"></select>
+        <select id="phaseAxX" title="Observable assignée à axe X. Pour mode 'Direct', chaque axe est une observable physique interprétable." style="width: 100%;"></select>
       </div>
       <div class="form-row" style="margin-bottom: 6px;">
         <label style="font-size: 10px; color: var(--cyan);">AXE Y</label>
-        <select id="phaseAxY" style="width: 100%;"></select>
+        <select id="phaseAxY" title="Observable assignée à axe Y." style="width: 100%;"></select>
       </div>
       <div class="form-row" style="margin-bottom: 6px;">
         <label style="font-size: 10px; color: var(--cyan);">AXE Z</label>
-        <select id="phaseAxZ" style="width: 100%;"></select>
+        <select id="phaseAxZ" title="Observable assignée à axe Z." style="width: 100%;"></select>
       </div>
     </div>
 
@@ -631,7 +632,7 @@
       <label style="font-size: 10px; color: var(--cyan); display:flex; justify-content:space-between;">
         <span>DIMENSION m</span><span id="phaseMVal">3</span>
       </label>
-      <input id="phaseM" type="range" min="2" max="9" value="3" step="1" style="width: 100%;">
+      <input id="phaseM" type="range" min="2" max="9" value="3" step="1" title="Dimension de plongement m. Théorème Whitney : m ≥ 2·d_box_dim + 1. Pour la plupart des systèmes, m=3 suffit pour visualisation." style="width: 100%;">
     </div>
 
     <div class="panel-actions" style="margin-bottom: 14px;">
@@ -922,6 +923,219 @@ empty void</textarea>
       <button id="runAllBtn" title="Pipeline complet : exécute dynamics + spectral + causal + topology + SINDy/emergence séquentiellement. Remplit tous les onglets d'analyse.">run all analyses</button>
       <button id="reportBtn" style="margin-top: 6px; color: var(--amber); border-color: var(--amber);" title="Génère rapport HTML standalone avec tous les analytics + snapshots canvas embedded. Téléchargeable, partageable, archive recherche.">export HTML report</button>
     </div>
+  </div>
+
+  <!-- HELP / Glossary -->
+  <div class="tab-panel" data-panel="help">
+    <h2>HELP · GUIDE D'UTILISATION</h2>
+    <p style="font-size: 11px; color: rgba(255,255,255,0.75); line-height: 1.5; margin-bottom: 12px;">
+      Dynamoscope analyse vidéo comme <b>trajectoire dans espace latent</b>.
+      Pipeline : video → encoder → reduction 3D → métriques dynamiques + topologie + causalité.
+      Pour manuel complet voir <code>MANUAL.md</code> dans repo.
+    </p>
+
+    <div style="background: rgba(0,100,200,0.08); border-left: 2px solid var(--cyan); padding: 8px 10px; margin-bottom: 14px; font-size: 10px;">
+      <b style="color: var(--cyan);">QUICK START</b><br>
+      1. Charger vidéo (ou choisir système de référence). <br>
+      2. Sélectionner encoder (gauche). Lancer pipeline.<br>
+      3. Naviguer onglets droite pour analyses.<br>
+      4. Onglet <b>phase-space</b> pour pipeline classique alternatif.<br>
+      5. <b>run all analyses</b> dans status pour tout exécuter d'un coup.
+    </div>
+
+    <h3 style="font-size: 11px; color: var(--cyan); letter-spacing: 0.2em; margin: 14px 0 6px;">ONGLETS</h3>
+    <dl style="font-size: 10px; line-height: 1.5; margin: 0;">
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">dynamics</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Exposant de Lyapunov (chaos), dimension de corrélation (fractale),
+        RQA (récurrence, déterminisme, laminarity), matrice de récurrence.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">spectral</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        DMD (modes Koopman + fréquences), spectre de puissance, exposant scaling.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">causal</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Granger, Transfer Entropy KSG, PCMCI+ graph causal.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">topology</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Homologie persistante (H0 composantes, H1 cycles), entropie persistance.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">SINDy · φ</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Découverte équations différentielles sparse + indice émergence φ_id.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">phase-space</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Pipeline classique : 12 observables pixel-level → Takens delay
+        (ou PCA / direct) → trajectoire + verdict régime.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">inspect / segments / clusters / predict</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Frame k-NN, shot boundaries, HDBSCAN clustering, prédiction trajectoire.
+      </dd>
+      <dt style="font-weight: 700; color: var(--amber); margin-top: 6px;">DNA · evolution</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Score composite 8 axes + évolution sliding window.
+      </dd>
+    </dl>
+
+    <h3 style="font-size: 11px; color: var(--cyan); letter-spacing: 0.2em; margin: 14px 0 6px;">GLOSSAIRE — métriques</h3>
+    <dl style="font-size: 10px; line-height: 1.5; margin: 0;">
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Lyapunov λ</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        <b>Formel</b> : pente de ⟨ln d(t)⟩ vs t, où d(t) = distance entre trajectoires
+        initialement proches. <b>Vulgaire</b> : à quelle vitesse 2 conditions initiales
+        proches divergent. λ &gt; 0 = chaos, λ ≈ 0 = régulier, λ &lt; 0 = converge.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Correlation dim (D)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        <b>Formel</b> : d = lim_{ε→0} log C(ε) / log ε (Grassberger-Procaccia).
+        <b>Vulgaire</b> : dimension fractale effective. Lorenz : D ≈ 2.06 (non-entier).
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">RQA — DET, LAM, RR</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        <b>Formel</b> : sur matrice de récurrence Rᵢⱼ = 𝟙[‖zᵢ-zⱼ‖ &lt; ε].
+        DET = fraction sur diagonales ≥ 2 (prédictibilité). LAM = sur verticales
+        (phases stationnaires). RR = densité globale.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Lmax / N</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Longueur plus longue diagonale / N. Haut = cycle régulier ; bas = chaos.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Convergence rate</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Décroissance relative du rayon de trajectoire vs barycentre.
+        &gt; 0.5 = converge vers point fixe.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">H0, H1, H2 (persistance)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Classes homologie : H0 = composantes connexes, H1 = cycles (anneaux),
+        H2 = cavités (sphères). Calculées sur filtration Vietoris-Rips.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Persistence entropy</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Entropie de Shannon des persistances normalisées. Haute = topologie riche.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Transfer Entropy (TE)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Causalité informationnelle. TE(X→Y) &gt; 0 ⟹ passé X aide prédire futur Y.
+        Estimateur KSG (k plus proches voisins).
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">DMD eigenvalues</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Modes Koopman approximés. |λ| = 1 = oscillation, &lt; 1 = décroissance.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">Spectral slope</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Exposant 1/f^α du spectre. α = 0 bruit blanc, α = 2 brown.
+      </dd>
+      <dt style="font-weight: 700; color: var(--magenta); margin-top: 6px;">DNA composite</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Score [0, 100] = somme pondérée 8 axes (chaos, topology, complexity,
+        spectral, structure, causality, predictability, regime_confidence).
+      </dd>
+    </dl>
+
+    <h3 style="font-size: 11px; color: var(--cyan); letter-spacing: 0.2em; margin: 14px 0 6px;">GLOSSAIRE — algorithmes</h3>
+    <dl style="font-size: 10px; line-height: 1.5; margin: 0;">
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">Takens delay embedding</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Reconstruction d'attracteur depuis une observable scalaire s(t) :
+        x(t) = [s(t), s(t+τ), ..., s(t+(m-1)τ)]. Théorème : si m ≥ 2d+1, x(t)
+        est diffeomorphe à l'attracteur réel.
+      </dd>
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">UMAP</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Réduction dim non-linéaire préservant voisinages locaux. Params clés :
+        n_neighbors (taille voisinage), min_dist (compaction).
+      </dd>
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">PCA</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Projection sur axes de variance maximale. Linéaire, déterministe.
+      </dd>
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">DMD (Dynamic Mode Decomposition)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Trouve A tel que z_{t+1} ≈ A z_t via SVD. Spectre de A donne modes.
+      </dd>
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">SINDy</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Sparse regression sur library polynomiale → équations différentielles
+        dz/dt = f(z). Pour Lorenz : retrouve équations originales.
+      </dd>
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">PCMCI+</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Découverte causale multi-variée pour séries temporelles. Combine PC
+        algorithm (élimination via indépendance conditionnelle) + MCI.
+      </dd>
+      <dt style="font-weight: 700; color: var(--plasma); margin-top: 6px;">HDBSCAN</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Clustering hiérarchique densité-based. Pas besoin de fixer K. Identifie
+        outliers (label -1).
+      </dd>
+    </dl>
+
+    <h3 style="font-size: 11px; color: var(--cyan); letter-spacing: 0.2em; margin: 14px 0 6px;">GLOSSAIRE — encoders</h3>
+    <dl style="font-size: 10px; line-height: 1.5; margin: 0;">
+      <dt style="font-weight: 700; color: rgba(150,200,255,1); margin-top: 6px;">ResNet50 (25M params)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        He 2016. CNN supervisé ImageNet. Latent 2048d.
+      </dd>
+      <dt style="font-weight: 700; color: rgba(150,200,255,1); margin-top: 6px;">DINOv2-S (22M)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Oquab 2024. ViT self-supervisé par distillation. Latent 384d.
+      </dd>
+      <dt style="font-weight: 700; color: rgba(150,200,255,1); margin-top: 6px;">CLIP ViT-B/32 (151M)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Radford 2021. Image-text contrastive. Permet query textuel.
+      </dd>
+      <dt style="font-weight: 700; color: rgba(150,200,255,1); margin-top: 6px;">VideoMAE-base (86M)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Tong 2022. Self-sup 16-frame clips, mask 75%.
+      </dd>
+      <dt style="font-weight: 700; color: rgba(150,200,255,1); margin-top: 6px;">V-JEPA 2 (326M)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Bardes 2024 Meta. World model prédictif latent space. Latent 1024d.
+        Notre probe : R²=0.57 = le plus aligné avec observables physiques.
+      </dd>
+      <dt style="font-weight: 700; color: rgba(150,200,255,1); margin-top: 6px;">delay_motion / entropy / brightness</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Classical Takens delay sur 1 observable physique. 3d latent.
+        Zero GPU, interprétable, parfois bat neural encoders sur dynamics.
+      </dd>
+    </dl>
+
+    <h3 style="font-size: 11px; color: var(--cyan); letter-spacing: 0.2em; margin: 14px 0 6px;">GLOSSAIRE — visualisations</h3>
+    <dl style="font-size: 10px; line-height: 1.5; margin: 0;">
+      <dt style="font-weight: 700; color: var(--cyan); margin-top: 6px;">Trajectoire 3D centre viewport</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Latents réduits à 3D via UMAP/PCA. Points = frames. Lignes = ordre temporel.
+        Couleur configurable : temps, vitesse, récurrence, cluster.
+      </dd>
+      <dt style="font-weight: 700; color: var(--cyan); margin-top: 6px;">Recurrence plot (matrice)</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Point clair en (i,j) ⟺ états zᵢ et zⱼ ε-proches. Diagonales =
+        déterminisme. Bruit = motif aléatoire. Cycles = motifs périodiques.
+      </dd>
+      <dt style="font-weight: 700; color: var(--cyan); margin-top: 6px;">Persistence diagram</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Points (birth, death). Près diagonale = bruit. Loin diagonale = features
+        topologiques persistants (vrais cycles).
+      </dd>
+      <dt style="font-weight: 700; color: var(--cyan); margin-top: 6px;">DMD spectrum</dt>
+      <dd style="margin-left: 12px; color: rgba(255,255,255,0.7);">
+        Eigenvalues dans plan complexe. Cercle unité = oscillations stables.
+      </dd>
+    </dl>
+
+    <h3 style="font-size: 11px; color: var(--cyan); letter-spacing: 0.2em; margin: 14px 0 6px;">RÉFÉRENCES</h3>
+    <p style="font-size: 9px; color: rgba(255,255,255,0.55); line-height: 1.5;">
+      Takens 1981 · Rosenstein 1993 · Schreiber 2000 · Wiskott-Sejnowski 2002 ·
+      Brunton 2016 SINDy · Edelsbrunner-Harer persistence · Runge 2018 PCMCI ·
+      Hafner Dreamer · Bardes 2024 V-JEPA · Oquab 2024 DINOv2 · Yu 2020 PCGrad.
+      Voir <code>paper/dynamoscope.tex</code> bibliography complète (35 refs).
+    </p>
   </div>
 </div>
 
