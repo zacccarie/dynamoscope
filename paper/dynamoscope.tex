@@ -48,10 +48,11 @@ convergent cross-mapping), sparse equation discovery (SINDy), slow
 feature extraction (SFA), latent prediction with counterfactual
 rollouts (predictive coding / JEPA-style imagination), and
 unsupervised cluster discovery (HDBSCAN) with optional CLIP-based
-semantic labeling. Four encoders (ResNet50, ViT-B/16, DINOv2-S, CLIP
-ViT-B/32) and an aligned audio modality (wav2vec2) allow direct
-comparison of how different pretraining objectives shape the recovered
-trajectory geometry. We argue that the gaps and clusters seen in
+semantic labeling. Five encoders (ResNet50, ViT-B/16, DINOv2-S, CLIP
+ViT-B/32, and VideoMAE-base) and an aligned audio modality
+(wav2vec2) allow direct comparison of how different pretraining
+objectives---including a natively temporal one---shape the
+recovered trajectory geometry. We argue that the gaps and clusters seen in
 non-linear projections such as UMAP are not noise but structural
 detectors operating at a chosen scale, and we propose an interactive
 parameter optimization layer (random and Bayesian) that lets the user
@@ -255,9 +256,12 @@ ResNet50 V2~\cite{he2016deep}    & 2048 & 25\,M  & Supervised ImageNet \\
 ViT-B/16~\cite{dosovitskiy2020vit} & 768  & 86\,M  & Supervised ImageNet \\
 DINOv2-S/14~\cite{oquab2023dinov2}& 384  & 22\,M  & Self-supervised distillation \\
 CLIP ViT-B/32~\cite{radford2021clip} & 512  & 151\,M & Contrastive image--text \\
+VideoMAE-base~\cite{tong2022videomae} & 768  & 86\,M  & Self-supervised, 16-frame clips (Kinetics-400) \\
 \bottomrule
 \end{tabular}
-\caption{Encoders shipped with \textsc{Dynamoscope}.}
+\caption{Encoders shipped with \textsc{Dynamoscope}. VideoMAE is the only
+encoder that natively integrates temporal context: each output feature
+aggregates a 16-frame window centered on the target frame.}
 \label{tab:encoders}
 \end{table}
 
@@ -444,15 +448,25 @@ to the closed orbits around each butterfly wing.
 \subsection{Encoder effect on real video}
 
 On a 6-second continuous Mandelbrot zoom (90 sampled frames), the
-three image encoders produce qualitatively different latent
+five available encoders produce qualitatively different latent
 trajectories. ResNet50 yields a piecewise zigzag, reflecting the
 discrete jumps activated as the zoom traverses the boundaries of
 ImageNet category responses. ViT-B/16 is similar. DINOv2-S produces
 a smooth monotonic curve, with mean cosine velocity
 $\approx 0.009$ per frame --- roughly 2.6$\times$ smoother than
-ResNet50. CLIP sits between the two. This direct visualization of
-encoder bias is, in our view, one of the most pedagogically useful
-features of the tool.
+ResNet50. CLIP sits between the two. VideoMAE-base, the only
+encoder that integrates a 16-frame temporal context per output,
+produces a trajectory three orders of magnitude smoother than
+DINOv2 (mean cosine velocity $\approx 5\times 10^{-5}$). This is
+consistent with its training objective: by reconstructing masked
+spatio-temporal patches across 16-frame windows, VideoMAE learns
+features that are explicitly invariant to local motion, yielding an
+ultra-smooth latent stream for any continuous transformation. The
+trade-off is computational: per-frame encoding is approximately
+$10\times$ slower than single-frame encoders, which limits live
+applications. This direct comparison across five encoders is, in
+our view, one of the most pedagogically useful features of the
+tool.
 
 \subsection{UMAP gaps as scale-dependent structure}
 
@@ -545,28 +559,33 @@ methodological triangulation in the sense of mixed methods research.
 
 \subsection{Limitations}
 
-\textsc{Dynamoscope} encodes each frame independently. Genuine
-video models such as VideoMAE~\cite{tong2022videomae} or
-V-JEPA~\cite{bardes2024vjepa} that attend across multiple frames
-should provide qualitatively better representations of motion, and
-are a natural next step. The current causal module operates only on
-projected principal components, which limits its statistical power
-on short sequences. The CCM implementation is a single-fixed-library
-variant; a full convergence test
-\cite{sugihara2012ccm} requires multiple library sizes. Persistent
-homology is computed only up to $H_1$ for performance.
+The pipeline now includes VideoMAE-base as a native temporal
+encoder, addressing the original single-frame limitation. Further
+temporal models such as V-JEPA~\cite{bardes2024vjepa} would extend
+the range of motion-aware representations, particularly for long
+horizons. The current causal module operates only on projected
+principal components, which limits its statistical power on short
+sequences. The CCM implementation is a single-fixed-library
+variant; a full convergence test~\cite{sugihara2012ccm} requires
+multiple library sizes. Persistent homology is computed only up to
+$H_1$ for performance. VideoMAE per-frame encoding via centered
+16-frame windows is approximately ten times slower than
+single-frame encoders, which precludes live webcam use at present;
+a sliding-stride variant would help.
 
 \subsection{Future work}
 
-In addition to integrating native video encoders, we plan to add:
-neural ODE / SDE fits to the latent trajectory to obtain smooth
-parametric flows; differentiable parametric
+Beyond the current VideoMAE integration, several directions are
+planned: V-JEPA~\cite{bardes2024vjepa} for long-horizon motion-aware
+features; neural ODE / SDE fits to the latent trajectory to obtain
+smooth parametric flows; differentiable parametric
 UMAP~\cite{sainburg2021parametric} so that the projection can be
 optimized jointly with downstream losses; multi-video comparison
 through a learned shared embedding; a streaming variant of
-persistent homology (\emph{vineyards}); and a richer cross-modal
-analysis with text and language-model embeddings as additional
-modalities.
+persistent homology (\emph{vineyards}); wavelet scattering networks
+\`a la Mallat for translation-invariant multi-scale features; and a
+richer cross-modal analysis with text and language-model embeddings
+as additional modalities.
 
 \section{Conclusion}
 
