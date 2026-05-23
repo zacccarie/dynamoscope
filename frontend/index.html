@@ -46,7 +46,18 @@
     border: 1px solid var(--border);
   }
   .axis-overlay .ax-line { display: flex; align-items: center; gap: 8px; }
-  .axis-overlay .swatch { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
+  .axis-overlay .swatch { width: 10px; height: 10px; border-radius: 50%; }
+  #nodeTooltip { position: fixed; z-index: 30; pointer-events: none; display: none;
+    background: rgba(7, 7, 11, 0.96); border: 1px solid var(--border-strong);
+    border-radius: 3px; padding: 8px; font-family: var(--mono); font-size: 10px;
+    color: var(--fg); width: 200px; }
+  #nodeTooltip img { width: 100%; display: block; border-radius: 2px; margin-bottom: 6px; border: 1px solid var(--border); }
+  #nodeTooltip .row { display: flex; justify-content: space-between; padding: 2px 0; }
+  #nodeTooltip .k { color: rgba(255,255,255,0.5); }
+  #nodeTooltip .v { color: var(--cyan); }
+  #nodeTooltip .v.plasma { color: var(--plasma); }
+  #nodeTooltip .v.amber { color: var(--amber); }
+  #nodeTooltip .v.magenta { color: var(--magenta); }
   .axis-overlay .lbl { color: var(--fg); font-weight: 600; }
   .axis-overlay .desc { color: rgba(255,255,255,0.55); }
   .grain { position: fixed; inset: 0; pointer-events: none; opacity: 0.035; z-index: 1;
@@ -96,7 +107,7 @@
   }
   select:focus, input:focus { border-color: var(--cyan); }
   input[type="range"].param-slider { width: 100%; accent-color: var(--cyan); -webkit-appearance: none; appearance: none; height: 3px; background: rgba(255,255,255,0.12); border-radius: 2px; outline: none; }
-  input[type="range"].param-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); cursor: pointer; }
+  input[type="range"].param-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--cyan); cursor: pointer; }
   .slider-field { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline; margin-bottom: 8px; }
   .slider-field label { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.12em; grid-column: 1; }
   .slider-field .val { font-family: var(--mono); font-size: 10px; color: var(--plasma); justify-self: end; grid-column: 2; }
@@ -107,9 +118,9 @@
     padding: 7px 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
     cursor: pointer; border-radius: 2px; transition: all 0.16s; width: 100%;
   }
-  button:hover { background: var(--cyan); color: #000; box-shadow: 0 0 14px rgba(0,229,255,0.45); }
+  button:hover { background: var(--cyan); color: #000; }
   button.alt { color: var(--magenta); border-color: var(--magenta); }
-  button.alt:hover { background: var(--magenta); color: #000; box-shadow: 0 0 14px rgba(255,45,212,0.45); }
+  button.alt:hover { background: var(--magenta); color: #000; }
   button.muted { color: rgba(255,255,255,0.65); border-color: rgba(255,255,255,0.2); }
   button.muted:hover { color: #fff; border-color: var(--cyan); background: rgba(0,229,255,0.08); box-shadow: none; }
   button:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
@@ -121,6 +132,7 @@
   #playerHost { width: 100%; aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
   #playerHost .ph { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.16em; }
   #playerImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .knn-cell:hover { border-color: var(--cyan); }
   .player-meta { display: flex; justify-content: space-between; padding: 5px 8px;
     font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.45);
     border-top: 1px solid var(--border); background: rgba(0,0,0,0.5); }
@@ -159,7 +171,7 @@
   }
   .scrubber::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-    background: var(--cyan); box-shadow: 0 0 12px var(--cyan); cursor: pointer;
+    background: var(--cyan); cursor: pointer;
   }
   #status { font-family: var(--mono); font-size: 10px; color: var(--amber); min-width: 200px; }
   .pulse { animation: pulse 1.4s ease-in-out infinite; }
@@ -172,7 +184,7 @@
     position: sticky; top: 0; z-index: 2;
   }
   .knn-cell { position: relative; cursor: pointer; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
-  .knn-cell:hover { border-color: var(--cyan); box-shadow: 0 0 8px rgba(0,229,255,0.5); }
+  .knn-cell:hover { border-color: var(--cyan); }
   .knn-cell img { width: 100%; display: block; }
   .knn-cell .meta { position: absolute; bottom: 0; left: 0; right: 0; padding: 2px 4px;
     font-family: var(--mono); font-size: 8px; background: rgba(0,0,0,0.75); color: var(--plasma); }
@@ -215,9 +227,9 @@
   .bar-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-family: var(--mono); font-size: 9px; }
   .bar-row .lbl { width: 28px; color: rgba(255,255,255,0.5); text-align: right; }
   .bar-row .bar { height: 8px; background: linear-gradient(90deg, var(--cyan), var(--magenta));
-    border-radius: 1px; box-shadow: 0 0 6px var(--cyan); }
+    border-radius: 1px; }
   .bar-row .ebar { height: 7px; background: linear-gradient(90deg, var(--plasma), var(--cyan));
-    border-radius: 1px; box-shadow: 0 0 6px var(--plasma); }
+    border-radius: 1px; }
   .bar-row .val { color: var(--plasma); margin-left: auto; }
 
   /* ─── history panel (modal-style overlay) ──────────────── */
@@ -284,11 +296,12 @@
     <div class="section-title">video input</div>
     <div class="field">
       <label>encoder</label>
-      <select id="encoderSel" title="Encoder : transforme chaque frame en vecteur features. ResNet50/ViT-B = supervised ImageNet, biais classes. DINOv2 = self-supervised, sans biais. CLIP = espace partagé avec texte pour query sémantique.">
+      <select id="encoderSel" title="Encoder : transforme chaque frame en vecteur features. ResNet50/ViT-B = supervised ImageNet (biais classes). DINOv2 = self-supervised (sans biais labels). CLIP = espace partagé texte. VideoMAE = temporal (16-frame context window, motion-aware) — plus lent mais features avec continuité native.">
         <option value="resnet50">ResNet50 · 2048d · ImageNet supervised</option>
         <option value="vit_b_16">ViT-B/16 · 768d · ImageNet supervised</option>
         <option value="dinov2_vits14">DINOv2-S · 384d · self-supervised</option>
         <option value="clip_vit_b32">CLIP ViT-B/32 · 512d · text-image</option>
+        <option value="videomae_base">VideoMAE-base · 768d · temporal (clip-aware)</option>
       </select>
     </div>
     <div class="field">
@@ -453,6 +466,7 @@
 
 <!-- ─── CENTER : Three.js canvas ───────────────────────────── -->
 <canvas id="canvas"></canvas>
+<div id="nodeTooltip"></div>
 <div class="axis-overlay" id="axisOverlay">
   <div class="ax-line"><span class="swatch" style="background:#00e5ff; color:#00e5ff;"></span><span class="lbl">X</span><span class="desc" id="axOvX">—</span></div>
   <div class="ax-line"><span class="swatch" style="background:#ff2dd4; color:#ff2dd4;"></span><span class="lbl">Y</span><span class="desc" id="axOvY">—</span></div>
@@ -738,7 +752,7 @@ empty void</textarea>
     <button id="dnaBtn" style="color: var(--plasma); border-color: var(--plasma);" title="Score composite 0-100 synthétisant 7 axes (chaos, topology, complexity, spectral, structure, causality, predictability). Classification automatique du régime.">compute DNA</button>
     <div id="dnaResult" style="display:none; margin-top: 14px;">
       <div style="text-align: center; padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-        <div id="dnaScore" style="font-family: var(--mono); font-size: 48px; color: var(--plasma); text-shadow: 0 0 20px var(--plasma); letter-spacing: 0.05em;">—</div>
+        <div id="dnaScore" style="font-family: var(--mono); font-size: 48px; color: var(--plasma); letter-spacing: 0.05em;">—</div>
         <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 0.2em; margin-top: 4px;">COMPLEXITY · /100</div>
         <div id="dnaLabel" style="font-family: var(--mono); font-size: 11px; color: var(--cyan); margin-top: 10px; letter-spacing: 0.08em;">—</div>
       </div>
@@ -857,9 +871,6 @@ empty void</textarea>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -876,21 +887,14 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.rotateSpeed = 0.6;
 
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.9, 0.35, 0.05);
-composer.addPass(bloom);
-
 // resize bind to canvas grid cell
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(1, rect.width);
   const h = Math.max(1, rect.height);
   renderer.setSize(w, h, false);
-  composer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  bloom.resolution.set(w, h);
 }
 new ResizeObserver(resizeCanvas).observe(canvas);
 resizeCanvas();
@@ -1028,8 +1032,7 @@ function drawCounterfactuals(rollouts, startIdx) {
     const hue = (s / N) * 0.7 + 0.05;  // skip rouge pur
     const c = new THREE.Color().setHSL(hue, 0.9, 0.6);
     const line = new THREE.Line(g, new THREE.LineBasicMaterial({
-      color: c, transparent: true, opacity: 0.45,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      color: c, transparent: true, opacity: 0.35,
     }));
     scene.add(line);
     cfGhosts.push(line);
@@ -1058,8 +1061,8 @@ function drawGhost(ghost3d, startIdx) {
   lg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   lg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   ghostLine = new THREE.Line(lg, new THREE.LineDashedMaterial({
-    vertexColors: true, transparent: true, opacity: 0.9,
-    dashSize: 0.06, gapSize: 0.03, scale: 1.0, blending: THREE.AdditiveBlending, depthWrite: false,
+    vertexColors: true, transparent: true, opacity: 0.7,
+    dashSize: 0.06, gapSize: 0.03, scale: 1.0,
   }));
   ghostLine.computeLineDistances();
   scene.add(ghostLine);
@@ -1067,8 +1070,8 @@ function drawGhost(ghost3d, startIdx) {
   pg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   pg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   ghostPoints = new THREE.Points(pg, new THREE.PointsMaterial({
-    size: 0.035, vertexColors: true, transparent: true, opacity: 0.85,
-    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+    size: 0.022, vertexColors: true, transparent: true, opacity: 0.75,
+    sizeAttenuation: true,
   }));
   scene.add(ghostPoints);
 }
@@ -1213,8 +1216,8 @@ function buildTrajectory(coords) {
   pg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   pg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   pointsObj = new THREE.Points(pg, new THREE.PointsMaterial({
-    size: 0.028, vertexColors: true, transparent: true, opacity: 0.95,
-    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+    size: 0.025, vertexColors: true, transparent: true, opacity: 0.92,
+    sizeAttenuation: true,
   }));
   scene.add(pointsObj);
 
@@ -1222,7 +1225,7 @@ function buildTrajectory(coords) {
   lg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   lg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   lineObj = new THREE.Line(lg, new THREE.LineBasicMaterial({
-    vertexColors: true, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false,
+    vertexColors: true, transparent: true, opacity: 0.45,
   }));
   scene.add(lineObj);
 
@@ -1282,6 +1285,84 @@ canvas.addEventListener('click', (e) => {
   if (!hits.length) return;
   const idx = hits[0].index;
   selectFrame(idx);
+});
+
+// Hover tooltip : raycaster mousemove + DOM tooltip avec frame info
+const nodeTooltip = document.getElementById('nodeTooltip');
+let lastHoverIdx = -1;
+
+function formatTimecode(idx, fps = 30) {
+  const totalSec = idx / fps;
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = Math.floor(totalSec % 60);
+  const ms = Math.floor((totalSec * 1000) % 1000);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+}
+
+function renderTooltip(idx, clientX, clientY) {
+  if (!trajCoords || idx < 0 || idx >= trajCoords.length) {
+    nodeTooltip.style.display = 'none';
+    return;
+  }
+  const n = trajCoords.length;
+  const fps = (currentBundle && currentBundle.meta && currentBundle.meta.fps) || 30;
+  const origIdx = frameIndices ? frameIndices[idx] : idx;
+  const tc = formatTimecode(origIdx, fps);
+  const coord = trajCoords[idx];
+  const velUmap = velocities ? velocities[idx] : null;
+  const velPerc = perceptualVel ? perceptualVel[idx] : null;
+  const clusterLbl = clusterLabels ? clusterLabels[idx] : null;
+  const surp = surpriseVec ? surpriseVec[idx] : null;
+  const thumbUrl = frameUrls && frameUrls[idx];
+
+  let html = '';
+  if (thumbUrl) html += `<img src="${thumbUrl}" alt="frame ${idx}" />`;
+  html += `<div class="row"><span class="k">frame</span><span class="v">#${idx} / ${n - 1}</span></div>`;
+  if (frameIndices) html += `<div class="row"><span class="k">orig idx</span><span class="v magenta">${origIdx}</span></div>`;
+  html += `<div class="row"><span class="k">timecode</span><span class="v amber">${tc}</span></div>`;
+  html += `<div class="row"><span class="k">coords 3D</span><span class="v">(${coord[0].toFixed(2)}, ${coord[1].toFixed(2)}, ${coord[2].toFixed(2)})</span></div>`;
+  if (velUmap !== null) html += `<div class="row"><span class="k">vel UMAP</span><span class="v plasma">${velUmap.toFixed(4)}</span></div>`;
+  if (velPerc !== null) html += `<div class="row"><span class="k">vel perceptual</span><span class="v plasma">${velPerc.toFixed(4)}</span></div>`;
+  if (clusterLbl !== null && clusterLbl !== undefined) {
+    const lblStr = clusterLbl === -1 ? 'noise' : `#${clusterLbl}`;
+    html += `<div class="row"><span class="k">cluster</span><span class="v amber">${lblStr}</span></div>`;
+  }
+  if (surp !== null && surp !== undefined) html += `<div class="row"><span class="k">surprise</span><span class="v magenta">${surp.toFixed(3)}</span></div>`;
+  nodeTooltip.innerHTML = html;
+  // Position tooltip pres curseur, eviter sortie viewport
+  const tx = Math.min(window.innerWidth - 220, clientX + 18);
+  const ty = Math.min(window.innerHeight - 280, clientY + 18);
+  nodeTooltip.style.left = tx + 'px';
+  nodeTooltip.style.top = ty + 'px';
+  nodeTooltip.style.display = 'block';
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!pointsObj || !trajCoords) {
+    nodeTooltip.style.display = 'none';
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  mouseNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouseNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouseNdc, camera);
+  const hits = raycaster.intersectObject(pointsObj);
+  if (!hits.length) {
+    nodeTooltip.style.display = 'none';
+    lastHoverIdx = -1;
+    return;
+  }
+  const idx = hits[0].index;
+  if (idx !== lastHoverIdx) {
+    lastHoverIdx = idx;
+  }
+  renderTooltip(idx, e.clientX, e.clientY);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  nodeTooltip.style.display = 'none';
+  lastHoverIdx = -1;
 });
 
 async function selectFrame(idx) {
@@ -1561,12 +1642,9 @@ function drawTransitions(matrix, clusterIds, timePerCluster) {
     const r = 18 + 28 * (timePerCluster[i] / maxTime);
     const palette = CLUSTER_PALETTE[clusterIds[i] % CLUSTER_PALETTE.length];
     const rgb = `rgb(${Math.round(palette[0]*255)}, ${Math.round(palette[1]*255)}, ${Math.round(palette[2]*255)})`;
-    const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-    grd.addColorStop(0, rgb);
-    grd.addColorStop(1, rgb.replace(')', ',0)').replace('rgb', 'rgba'));
-    ctx.fillStyle = grd;
+    ctx.fillStyle = rgb;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, r * 0.7, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.font = `${Math.round(r * 0.7)}px "JetBrains Mono", monospace`;
@@ -1626,7 +1704,7 @@ document.getElementById('labelBtn').addEventListener('click', async () => {
       row.style.cssText = 'padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;';
       row.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px;">
-          <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${rgb}; box-shadow:0 0 6px ${rgb};"></span>
+          <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${rgb};"></span>
           <span style="color: var(--cyan); width: 28px;">#${c.id}</span>
           <span style="color: rgba(255,255,255,0.7); flex: 1;">size ${c.size}</span>
           <span style="color: rgba(255,255,255,0.5); font-size: 9px;">[${c.time_span[0]}-${c.time_span[1]}]</span>
@@ -1666,7 +1744,7 @@ document.getElementById('clusterBtn').addEventListener('click', async () => {
       const row = document.createElement('div');
       row.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 4px 0; font-family: var(--mono); font-size: 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);';
       row.innerHTML = `
-        <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${rgb}; box-shadow:0 0 6px ${rgb};"></span>
+        <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${rgb};"></span>
         <span style="color: var(--cyan); width: 28px;">#${c.id}</span>
         <span style="color: rgba(255,255,255,0.7); flex: 1;">size ${c.size}</span>
         <span style="color: rgba(255,255,255,0.5); font-size: 9px;">[${c.time_span[0]}-${c.time_span[1]}]</span>
@@ -1778,7 +1856,7 @@ function animate() {
   tick += 0.02;
   if (activeMarker) activeMarker.scale.setScalar(1 + 0.18 * Math.sin(tick * 2.4));
   controls.update();
-  composer.render();
+  renderer.render(scene, camera);
 }
 animate();
 
@@ -2351,14 +2429,11 @@ function drawKoopman(eigRe, eigIm, amps) {
   for (let i = 0; i < eigRe.length; i++) {
     const x = cx + eigRe[i] * R, y = cy - eigIm[i] * R;
     const a = amps[i] / aMax;
-    const radius = 4 + 10 * a;
-    const grd = koopCtx.createRadialGradient(x, y, 0, x, y, radius * 3);
-    grd.addColorStop(0, `rgba(0,255,136,${0.4 + 0.6 * a})`);
-    grd.addColorStop(1, 'rgba(0,255,136,0)');
-    koopCtx.fillStyle = grd;
-    koopCtx.beginPath(); koopCtx.arc(x, y, radius * 3, 0, Math.PI * 2); koopCtx.fill();
-    koopCtx.fillStyle = 'rgba(255,255,255,0.95)';
-    koopCtx.beginPath(); koopCtx.arc(x, y, radius * 0.6, 0, Math.PI * 2); koopCtx.fill();
+    const radius = 4 + 8 * a;
+    koopCtx.fillStyle = `rgba(0,255,136,${0.5 + 0.5 * a})`;
+    koopCtx.beginPath(); koopCtx.arc(x, y, radius, 0, Math.PI * 2); koopCtx.fill();
+    koopCtx.fillStyle = '#fff';
+    koopCtx.beginPath(); koopCtx.arc(x, y, radius * 0.4, 0, Math.PI * 2); koopCtx.fill();
   }
 }
 
@@ -2436,10 +2511,11 @@ function drawCausalGraph(labels, te) {
   }
   for (let i = 0; i < n; i++) {
     const p = pos[i];
-    const grd = causalCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 28);
-    grd.addColorStop(0, 'rgba(0,229,255,1)'); grd.addColorStop(1, 'rgba(0,229,255,0)');
-    causalCtx.fillStyle = grd;
-    causalCtx.beginPath(); causalCtx.arc(p.x, p.y, 28, 0, Math.PI * 2); causalCtx.fill();
+    causalCtx.fillStyle = 'rgba(0,229,255,0.85)';
+    causalCtx.beginPath(); causalCtx.arc(p.x, p.y, 16, 0, Math.PI * 2); causalCtx.fill();
+    causalCtx.strokeStyle = 'rgba(0,229,255,1)';
+    causalCtx.lineWidth = 1.5;
+    causalCtx.stroke();
     causalCtx.fillStyle = '#fff';
     causalCtx.font = '18px "JetBrains Mono", monospace';
     causalCtx.textAlign = 'center'; causalCtx.textBaseline = 'middle';

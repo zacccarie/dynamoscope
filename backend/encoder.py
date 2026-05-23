@@ -197,16 +197,76 @@ class CLIPEncoder:
         return feats
 
 
+class VideoMAEEncoder:
+    """VideoMAE-base (Tong et al. 2022) · 768d output per-frame via clip context.
+
+    Premier encoder réellement temporel : attend clips de 16 frames,
+    produit features qui agrègent contexte temporel (mouvement, transitions).
+
+    Architecture : Masked Autoencoder sur tubelet (T=2, P=16) patches.
+    Pretrained Kinetics-400 self-supervised → invariances motion natives.
+
+    Stratégie per-frame : pour chaque frame i, construit clip 16-frame
+    centré sur i (avec padding clamp aux bords), forward, mean-pool spatial+temporel
+    → 1 feature 768d par frame d'entrée.
+    """
+    name = "videomae_base"
+    latent_dim = 768
+
+    def __init__(self, device: torch.device | None = None):
+        """Charge VideoMAE-base via transformers. ~340MB checkpoint."""
+        self.device = device or get_device()
+        from transformers import VideoMAEModel, VideoMAEImageProcessor
+        self.model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
+        self.model.eval().to(self.device)
+        self.proc = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
+
+    @torch.no_grad()
+    def encode(self, frames: np.ndarray, batch_size: int = 4, clip_size: int = 16) -> np.ndarray:
+        """Per-frame encoding via 16-frame centered context window.
+
+        Pour chaque frame i, construit clip [i-7..i+8] clamped aux bords du tableau.
+        Forward batch_size clips à la fois. Mean-pool over spatial-temporal tokens.
+
+        Args:
+            frames: (N, H, W, 3) float [0,1] RGB
+            batch_size: nombre de clips traités ensemble (limite VRAM)
+            clip_size: longueur temporelle clip (16 = standard VideoMAE)
+
+        Returns:
+            (N, 768) features per-frame avec contexte temporel intégré
+        """
+        n = frames.shape[0]
+        frames_u8 = (frames * 255).clip(0, 255).astype(np.uint8)
+        out: list[np.ndarray] = []
+        half = clip_size // 2
+
+        for batch_start in range(0, n, batch_size):
+            batch_end = min(batch_start + batch_size, n)
+            batch_clips = []
+            for i in range(batch_start, batch_end):
+                idxs = [min(max(0, i - half + 1 + k), n - 1) for k in range(clip_size)]
+                clip = [frames_u8[j] for j in idxs]
+                batch_clips.append(clip)
+            inp = self.proc(batch_clips, return_tensors="pt")
+            inp = {k: v.to(self.device) for k, v in inp.items()}
+            h = self.model(**inp).last_hidden_state  # (B, T_patches, 768)
+            feats = h.mean(dim=1).float().cpu().numpy()
+            out.append(feats)
+        return np.concatenate(out, axis=0)
+
+
 # Registry : encoders disponibles, accessibles par nom string via /api endpoints
 ENCODER_REGISTRY = {
     "resnet50": ResNet50Encoder,
     "vit_b_16": ViTEncoder,
     "dinov2_vits14": DinoV2Encoder,
     "clip_vit_b32": CLIPEncoder,
+    "videomae_base": VideoMAEEncoder,
 }
 
 
-def get_encoder(name: Literal["resnet50", "vit_b_16", "dinov2_vits14", "clip_vit_b32"]):
+def get_encoder(name: Literal["resnet50", "vit_b_16", "dinov2_vits14", "clip_vit_b32", "videomae_base"]):
     """Factory function : instancie encoder par nom string.
 
     Lazy-loaded : modèle chargé en mémoire seulement quand requis.
