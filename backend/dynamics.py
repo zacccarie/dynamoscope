@@ -28,7 +28,7 @@ def mutual_info_lag(series: np.ndarray, max_lag: int = 50, bins: int = 16) -> in
     """
     n = len(series)
     mi = np.zeros(max_lag + 1)
-    series = (series - series.min()) / max(series.ptp(), 1e-9)
+    series = (series - series.min()) / max(np.ptp(series), 1e-9)
     for lag in range(1, max_lag + 1):
         x = series[:-lag]
         y = series[lag:]
