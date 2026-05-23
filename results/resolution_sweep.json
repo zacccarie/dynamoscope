@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "size": 64,
+      "cp_frame": 215,
+      "lag_frames": 115,
+      "mu_vis_observed": 0.5776942355889725,
+      "mu_vis_predicted": 0.2384185791015625,
+      "ratio_obs_pred": 2.4230252431077695,
+      "n_windows": 73,
+      "compute_s": 0.9
+    },
+    {
+      "size": 128,
+      "cp_frame": 210,
+      "lag_frames": 110,
+      "mu_vis_observed": 0.5526315789473684,
+      "mu_vis_predicted": 0.059604644775390625,
+      "ratio_obs_pred": 9.271619368421051,
+      "n_windows": 73,
+      "compute_s": 1.3
+    },
+    {
+      "size": 256,
+      "cp_frame": 195,
+      "lag_frames": 95,
+      "mu_vis_observed": 0.47744360902255634,
+      "mu_vis_predicted": 0.014901161193847656,
+      "ratio_obs_pred": 32.04069822556391,
+      "n_windows": 73,
+      "compute_s": 2.7
+    }
+  ],
+  "model": "delay_entropy_auto_m3",
+  "gt_frame": 100,
+  "configs": {
+    "n_frames": 400,
+    "window": 40,
+    "stride": 5,
+    "mu_start": -0.5,
+    "mu_end": 1.5,
+    "fixed_mx": 2.5
+  }
+}

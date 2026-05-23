@@ -1127,23 +1127,60 @@ Pipeline & Detected frame & Lead-time (frames) \\
 \end{table}
 
 Detection lags ground truth by 115--195 frames, corresponding to
-$\mu \in [+0.58,+0.97]$. This is not a framework failure: the Hopf
-limit-cycle radius near onset is $r(\mu) \propto \sqrt{\mu}$, so the
-cycle is mathematically present arbitrarily close to $\mu=0$ but
-\emph{visually} indistinguishable from a fixed point at 64$\times$64
-pixel resolution until $\sqrt{\mu}$ exceeds approximately one
-diameter unit. With our render the cycle becomes spatially distinct
-around $\mu \approx 0.5$, which is consistent with the observed
-detection point. We frame this as a Heisenberg-style resolution
-trade-off intrinsic to visual sensing: \emph{mathematical}
-bifurcation at $\mu^* = 0$ and \emph{visually detectable} bifurcation
-at $\mu_{\text{vis}} \approx 0.5$ are not the same event, and any
-video-based detector is upper-bounded by the latter. A higher-
-resolution render or a multi-scale wavelet pre-processing would lower
-$\mu_{\text{vis}}$ but cannot reduce it to zero. The regime-kind
-transitions reported by the classical pipelines (e.g.\ \texttt{cycle}
-$\to$ \texttt{strange} for \texttt{delay\_entropy} at frame 230)
-locate the visual transition correctly.
+$\mu \in [+0.58,+0.97]$.
+
+A first hypothesis is that the lag is set by a Heisenberg-style
+spatial-resolution trade-off : the Hopf limit-cycle radius near onset
+is $r(\mu) \propto \sqrt{\mu}$, so the cycle is mathematically present
+arbitrarily close to $\mu=0$ but visually indistinguishable from a
+fixed point until $\sqrt{\mu}$ exceeds a pixel-resolution threshold.
+Under this model, $\mu_{\text{vis}} \propto 1/\text{resolution}^2$,
+predicting a $4\times$ drop in $\mu_{\text{vis}}$ for each doubling of
+spatial resolution.
+
+We tested this directly by repeating the sliding-window analysis on
+renders at $64$, $128$, and $256$ pixels, keeping all other
+parameters fixed.
+
+\begin{table}[h]
+\centering
+\caption{Resolution sweep. Detected $\mu$ does not scale with
+resolution.}
+\label{tab:resolution-sweep}
+\begin{tabular}{rrrr}
+\toprule
+Size & Detected frame & $\mu_{\text{vis}}$ obs. & $\times$ inv from prev \\
+\midrule
+64 & 215 & $+0.578$ & --- \\
+128 & 210 & $+0.553$ & 1.05$\times$ \\
+256 & 195 & $+0.477$ & 1.16$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The observed mean ratio per resolution doubling is $1.10$, far from the
+predicted $4.0$. The Heisenberg hypothesis is therefore
+\emph{falsified} at the resolution range we tested. The detection limit
+is not set by spatial pixel count.
+
+The most plausible alternative explanation is that the binding
+constraints come from the temporal-analysis side of the pipeline:
+(a) the $40$-frame sliding window smooths sub-window dynamics;
+(b) the regime classifier uses fixed empirical thresholds
+($\text{TH}_{\text{noise-diag}}=0.045$,
+$\text{TH}_{\text{regular-diag}}=0.65$,
+$\text{TH}_{\text{converge-rel}}=0.55$); and
+(c) the classical observable pipeline (luminance histogram entropy on
+$32$ bins, delay embedding on a one-dimensional series, RQA on
+$\sim$ embedding distances) is largely invariant to pixel count once
+features are computed. Lowering the detection lag would require
+adjusting these temporal/feature parameters, not the spatial render.
+
+The regime-kind transitions reported by the classical pipelines (e.g.\
+\texttt{cycle} $\to$ \texttt{strange} for \texttt{delay\_entropy} at
+frame 230) locate the \emph{visual} transition correctly, but the
+visual transition itself is what is being detected, not the
+mathematical bifurcation.
 
 \section{Conclusion}
 
