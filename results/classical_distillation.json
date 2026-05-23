@@ -28,7 +28,7 @@
         47.76
       ]
     },
-    "distill": {
+    "distill_motion": {
       "mean": 45.63,
       "std": 3.6337308651026983,
       "min": 40.4,
@@ -41,6 +41,34 @@
         51.21,
         40.4
       ]
+    },
+    "distill_entropy": {
+      "mean": 46.038000000000004,
+      "std": 1.6959056577534017,
+      "min": 44.38,
+      "max": 48.13,
+      "n": 5,
+      "scores": [
+        44.7,
+        48.13,
+        48.08,
+        44.9,
+        44.38
+      ]
+    },
+    "phase_c_plus_distill": {
+      "mean": 45.15,
+      "std": 1.6293802502792283,
+      "min": 42.68,
+      "max": 47.82,
+      "n": 5,
+      "scores": [
+        45.08,
+        45.21,
+        44.96,
+        42.68,
+        47.82
+      ]
     }
   },
   "tests": {
@@ -49,52 +77,78 @@
       "p": 0.0002058829576534471,
       "significant": true
     },
-    "distill_vs_baseline": {
+    "distill_motion_vs_baseline": {
       "t": 2.2342256413172374,
       "p": 0.025468230107258627,
+      "significant": true
+    },
+    "distill_entropy_vs_baseline": {
+      "t": 3.1215483424655064,
+      "p": 0.0017990270834276068,
+      "significant": true
+    },
+    "phase_c_plus_distill_vs_baseline": {
+      "t": 2.6805389113289326,
+      "p": 0.007350371826694513,
       "significant": true
     }
   },
   "per_axis": {
     "chaos": {
-      "baseline_mean": 0.22016,
-      "distill_mean": 0.5732,
-      "delta": 0.35304
+      "baseline": 0.22016,
+      "phase_c": 0.5877600000000001,
+      "distill_motion": 0.5732,
+      "distill_entropy": 0.6072,
+      "phase_c_plus_distill": 0.60192
     },
     "topology": {
-      "baseline_mean": 0.40378,
-      "distill_mean": 0.5483399999999999,
-      "delta": 0.14455999999999997
+      "baseline": 0.40378,
+      "phase_c": 0.4716600000000001,
+      "distill_motion": 0.5483399999999999,
+      "distill_entropy": 0.512,
+      "phase_c_plus_distill": 0.46714
     },
     "complexity": {
-      "baseline_mean": 0.49794,
-      "distill_mean": 0.58334,
-      "delta": 0.08539999999999998
+      "baseline": 0.49794,
+      "phase_c": 0.50854,
+      "distill_motion": 0.58334,
+      "distill_entropy": 0.6012799999999999,
+      "phase_c_plus_distill": 0.51694
     },
     "spectral": {
-      "baseline_mean": 0.41390000000000005,
-      "distill_mean": 0.17165999999999998,
-      "delta": -0.24224000000000007
+      "baseline": 0.41390000000000005,
+      "phase_c": 0.37078,
+      "distill_motion": 0.17165999999999998,
+      "distill_entropy": 0.18774000000000002,
+      "phase_c_plus_distill": 0.34076
     },
     "structure": {
-      "baseline_mean": 0.5419400000000001,
-      "distill_mean": 0.53732,
-      "delta": -0.0046200000000000685
+      "baseline": 0.5419400000000001,
+      "phase_c": 0.70828,
+      "distill_motion": 0.53732,
+      "distill_entropy": 0.56176,
+      "phase_c_plus_distill": 0.41522000000000003
     },
     "causality": {
-      "baseline_mean": 0.031180000000000003,
-      "distill_mean": 0.04282,
-      "delta": 0.011639999999999994
+      "baseline": 0.031180000000000003,
+      "phase_c": 0.09398,
+      "distill_motion": 0.04282,
+      "distill_entropy": 0.040859999999999994,
+      "phase_c_plus_distill": 0.04206
     },
     "predictability": {
-      "baseline_mean": 0.5514600000000001,
-      "distill_mean": 0.73402,
-      "delta": 0.18255999999999994
+      "baseline": 0.5514600000000001,
+      "phase_c": 0.62192,
+      "distill_motion": 0.73402,
+      "distill_entropy": 0.7326199999999999,
+      "phase_c_plus_distill": 0.6365999999999999
     },
     "regime_confidence": {
-      "baseline_mean": 0.9298400000000001,
-      "distill_mean": 0.93566,
-      "delta": 0.005819999999999936
+      "baseline": 0.9298400000000001,
+      "phase_c": 1.0,
+      "distill_motion": 0.93566,
+      "distill_entropy": 1.0,
+      "phase_c_plus_distill": 1.0
     }
   },
   "raw": {
@@ -242,7 +296,7 @@
         "dna_label": "structured \u00b7 clustered \u00b7 predictable"
       }
     ],
-    "distill": [
+    "distill_motion": [
       {
         "dna_score": 43.32,
         "dna_axes": {
@@ -312,6 +366,150 @@
           "regime_confidence": 0.6783
         },
         "dna_label": "chaotic with periodic structure"
+      }
+    ],
+    "distill_entropy": [
+      {
+        "dna_score": 44.7,
+        "dna_axes": {
+          "chaos": 0.552,
+          "topology": 0.497,
+          "complexity": 0.614,
+          "spectral": 0.2267,
+          "structure": 0.4885,
+          "causality": 0.0031,
+          "predictability": 0.7227,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "intermediate complexity \u00b7 mixed regime"
+      },
+      {
+        "dna_score": 48.13,
+        "dna_axes": {
+          "chaos": 0.7228,
+          "topology": 0.5278,
+          "complexity": 0.581,
+          "spectral": 0.1655,
+          "structure": 0.7327,
+          "causality": 0.0687,
+          "predictability": 0.7048,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "chaotic with periodic structure"
+      },
+      {
+        "dna_score": 48.08,
+        "dna_axes": {
+          "chaos": 0.634,
+          "topology": 0.5278,
+          "complexity": 0.6677,
+          "spectral": 0.164,
+          "structure": 0.6106,
+          "causality": 0.0921,
+          "predictability": 0.753,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "chaotic with periodic structure"
+      },
+      {
+        "dna_score": 44.9,
+        "dna_axes": {
+          "chaos": 0.5804,
+          "topology": 0.4796,
+          "complexity": 0.612,
+          "spectral": 0.2093,
+          "structure": 0.6106,
+          "causality": 0.0,
+          "predictability": 0.7394,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "structured \u00b7 clustered \u00b7 predictable"
+      },
+      {
+        "dna_score": 44.38,
+        "dna_axes": {
+          "chaos": 0.5468,
+          "topology": 0.5278,
+          "complexity": 0.5317,
+          "spectral": 0.1732,
+          "structure": 0.3664,
+          "causality": 0.0404,
+          "predictability": 0.7432,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "chaotic with periodic structure"
+      }
+    ],
+    "phase_c_plus_distill": [
+      {
+        "dna_score": 45.08,
+        "dna_axes": {
+          "chaos": 0.8228,
+          "topology": 0.4394,
+          "complexity": 0.453,
+          "spectral": 0.3609,
+          "structure": 0.3664,
+          "causality": 0.0235,
+          "predictability": 0.5624,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "intermediate complexity \u00b7 mixed regime"
+      },
+      {
+        "dna_score": 45.21,
+        "dna_axes": {
+          "chaos": 0.6428,
+          "topology": 0.4394,
+          "complexity": 0.484,
+          "spectral": 0.3374,
+          "structure": 0.2442,
+          "causality": 0.1213,
+          "predictability": 0.6497,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "intermediate complexity \u00b7 mixed regime"
+      },
+      {
+        "dna_score": 44.96,
+        "dna_axes": {
+          "chaos": 0.4316,
+          "topology": 0.5781,
+          "complexity": 0.6223,
+          "spectral": 0.2454,
+          "structure": 0.3664,
+          "causality": 0.0,
+          "predictability": 0.6639,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "chaotic with periodic structure"
+      },
+      {
+        "dna_score": 42.68,
+        "dna_axes": {
+          "chaos": 0.3148,
+          "topology": 0.4394,
+          "complexity": 0.5437,
+          "spectral": 0.3402,
+          "structure": 0.6106,
+          "causality": 0.008,
+          "predictability": 0.6753,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "structured \u00b7 clustered \u00b7 predictable"
+      },
+      {
+        "dna_score": 47.82,
+        "dna_axes": {
+          "chaos": 0.7976,
+          "topology": 0.4394,
+          "complexity": 0.4817,
+          "spectral": 0.4199,
+          "structure": 0.4885,
+          "causality": 0.0575,
+          "predictability": 0.6317,
+          "regime_confidence": 1.0
+        },
+        "dna_label": "intermediate complexity \u00b7 mixed regime"
       }
     ]
   },

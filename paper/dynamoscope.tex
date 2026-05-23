@@ -863,6 +863,77 @@ observable producers to first-class objects in the model registry
 so they participate in cross-model benchmarks alongside encoders and
 world models.
 
+\subsection{Classical-to-Neural Distillation}
+
+Given that classical observable pipelines achieve higher
+dynamics-richness on the DNA score (Sec.~7.6), a natural question is
+whether a neural encoder can be trained to inherit this property. We
+introduce \texttt{ClassicalAlignmentLoss}, a Procrustes-invariant
+distance-matrix correlation loss that drives the neural latent
+geometry toward a frozen Takens trajectory computed from one
+classical observable. Given neural latent $z^{\text{N}}_{1:T}$ and
+classical target $z^{\text{C}}_{1:T}$,
+$$\mathcal{L}_{\text{align}} = 1 - \rho\!\left(\,\mathrm{vec}(D^{\text{N}}),\ \mathrm{vec}(D^{\text{C}})\,\right),$$
+where $D^{\cdot}_{ij}=\|z^{\cdot}_i - z^{\cdot}_j\|$, and $\rho$ is
+Pearson correlation on upper-triangular pairs (rotation, scale, and
+translation invariant).
+
+We train the mini-RSSM of Sec.~7.2 under five configurations, five
+seeds each, with double-pendulum render as a held-out chaotic regime
+never seen during training.
+
+\begin{table}[h]
+\centering
+\caption{Distillation ablation, 5 seeds, 15 epochs. Welch's
+$t$-test vs.\ baseline. All non-baseline configurations are
+statistically significant.}
+\label{tab:distillation}
+\begin{tabular}{lrrrr}
+\toprule
+Config & DNA mean & DNA std & $t$ vs.\ base & $p$ \\
+\midrule
+baseline (recon + dyn) & 40.03 & 3.46 & --- & --- \\
+phase\_c & \textbf{47.84} & 2.40 & $+3.71$ & 0.0002 \\
+distill\_motion & 45.63 & 3.63 & $+2.23$ & 0.025 \\
+distill\_entropy & 46.04 & 1.70 & $+3.12$ & 0.002 \\
+phase\_c + distill\_motion & 45.15 & 1.63 & $+2.68$ & 0.007 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three findings worth highlighting:
+
+\paragraph{(i) Distillation works.} A neural encoder trained
+\emph{only} with reconstruction, one-step dynamics, and alignment to
+a classical Takens trajectory (no Phase~C losses, no auxiliary
+diagnostic targets) achieves a statistically significant DNA
+improvement over baseline ($+5.6$ to $+6.0$ points, $p<0.03$). The
+gain comes through different axes than Phase~C: distillation
+strongly boosts \emph{chaos} ($+0.35$ vs baseline) and \emph{topology}
+($+0.14$) while increasing \emph{predictability} ($+0.18$). It is a
+genuine hybrid : neural smoothness + classical dynamics richness.
+
+\paragraph{(ii) Choice of classical oracle matters.}
+\texttt{distill\_entropy} outperforms \texttt{distill\_motion}
+($46.0$ vs.\ $45.6$) and has roughly half the variance across seeds
+($1.7$ vs.\ $3.6$). Entropy as observable captures texture-change
+rate, a more universal dynamical signal than raw motion magnitude.
+This is consistent with Sec.~7.6 where \texttt{delay\_entropy} was
+the best-ranked classical producer.
+
+\paragraph{(iii) Combining Phase~C and distillation does not help.}
+Counterintuitively, $\texttt{phase\_c + distill\_motion}$ underperforms
+$\texttt{phase\_c}$ alone (45.15 vs.\ 47.84). The two regularization
+schemes push the latent toward incompatible geometries: Phase~C
+target-shapes statistical properties of $z$ (variance-normalized
+slowness, sparse Granger structure, target Lyapunov), while
+distillation \emph{copies} a fixed reference geometry. The combined
+gradient is a tug-of-war the optimizer cannot win on a small model.
+We expect the gap closes with larger models and longer training, or
+with explicit gradient-surgery techniques (PCGrad), but we do not
+claim this. We expose this negative result prominently as a
+direction for future weighting-schedule research.
+
 \subsection{Honest Limitations}
 
 We do not claim Phase~C losses uniformly improve representations.

@@ -46,21 +46,32 @@ from backend.reducer import reduce_3d
 from backend.dna import compute_dna
 
 
-N_SEEDS = 5
-N_EPOCHS = 15
+import os
+N_SEEDS = int(os.environ.get("DYNAMOSCOPE_N_SEEDS", "5"))
+N_EPOCHS = int(os.environ.get("DYNAMOSCOPE_N_EPOCHS", "15"))
 TARGET_SIZE = 64
 
 
-def make_clips_with_classical_targets(seed: int) -> tuple[list, list]:
-    """Génère train clips + leurs Takens classical targets (motion, m=3)."""
+def make_clips_with_classical_targets(seed: int, observable: str = "motion") -> tuple[list, list]:
+    """Génère train clips + leurs Takens classical targets."""
     np_clips = []
     np_clips.append(np.stack(gen_bouncing_balls(n_frames=32, n_balls=3, seed=seed)).astype(np.uint8))
     np_clips.append(np.stack(gen_rotating_shapes(n_frames=32)).astype(np.uint8))
     np_clips.append(np.stack(gen_color_morph(n_frames=32)).astype(np.uint8))
 
     tensor_clips = [video_to_tensor(c, TARGET_SIZE) for c in np_clips]
-    targets = [compute_classical_target(c, observable="motion", m=3) for c in np_clips]
+    targets = [compute_classical_target(c, observable=observable, m=3) for c in np_clips]
     return tensor_clips, targets
+
+
+# Config spec : (recon, dyn always 1.0). w_sfa, w_causal, w_lyap, w_align, oracle.
+CONFIGS = {
+    "baseline":            {"sfa": 0.0, "causal": 0.0, "lyap": 0.0, "align": 0.0, "oracle": None},
+    "phase_c":             {"sfa": 0.5, "causal": 0.3, "lyap": 0.1, "align": 0.0, "oracle": None},
+    "distill_motion":      {"sfa": 0.0, "causal": 0.0, "lyap": 0.0, "align": 1.0, "oracle": "motion"},
+    "distill_entropy":     {"sfa": 0.0, "causal": 0.0, "lyap": 0.0, "align": 1.0, "oracle": "entropy"},
+    "phase_c_plus_distill":{"sfa": 0.5, "causal": 0.3, "lyap": 0.1, "align": 1.0, "oracle": "motion"},
+}
 
 
 def make_held_out() -> np.ndarray:
@@ -75,47 +86,53 @@ def train_one(cfg_name: str, seed: int) -> dict:
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    train_clips, classical_targets = make_clips_with_classical_targets(seed)
-    held_out = make_held_out()
+    spec = CONFIGS[cfg_name]
+    oracle = spec["oracle"]
 
-    cfg = TrainConfig(
-        n_epochs=N_EPOCHS,
-        embed_dim=64,
-        hidden_dim=128,
-    )
+    if oracle is not None:
+        train_clips, classical_targets = make_clips_with_classical_targets(seed, observable=oracle)
+    else:
+        train_clips, _ = make_clips_with_classical_targets(seed)
+        classical_targets = None
+
+    held_out = make_held_out()
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     model = MiniRSSM(in_channels=3, embed_dim=64, hidden_dim=128).to(device)
     optim = torch.optim.Adam(model.parameters(), lr=3e-4)
 
-    # Loss modules
-    sfa = SFASlownessRegularizer(weight=0.5)
-    causal = CausalSparsityLoss(weight=0.3)
-    lyap = LyapunovMatchingLoss(target_lyapunov=0.0, weight=0.1)
-    align = ClassicalAlignmentLoss(mode="distance_corr", weight=1.0)
+    sfa = SFASlownessRegularizer(weight=spec["sfa"]) if spec["sfa"] > 0 else None
+    causal = CausalSparsityLoss(weight=spec["causal"]) if spec["causal"] > 0 else None
+    lyap = LyapunovMatchingLoss(target_lyapunov=0.0, weight=spec["lyap"]) if spec["lyap"] > 0 else None
+    align = ClassicalAlignmentLoss(mode="distance_corr", weight=spec["align"]) if spec["align"] > 0 else None
 
-    targets_dev = [t.to(device) for t in classical_targets]
+    targets_dev = (
+        [t.to(device) for t in classical_targets]
+        if classical_targets is not None
+        else [None] * len(train_clips)
+    )
 
     for epoch in range(N_EPOCHS):
         for clip, target in zip(train_clips, targets_dev):
             frames = clip.to(device)
             z, z_pred, recon = model(frames)
             l_recon = ((recon - frames) ** 2).mean()
-            l_dyn = ((z_pred[:-1] - z[1:].detach()) ** 2).mean() if z.shape[0] >= 2 else torch.tensor(0.0, device=device)
-
+            l_dyn = (
+                ((z_pred[:-1] - z[1:].detach()) ** 2).mean()
+                if z.shape[0] >= 2
+                else torch.tensor(0.0, device=device)
+            )
             total = l_recon + l_dyn
-            if cfg_name == "phase_c":
-                total = total + sfa(z) + causal(z) + lyap(z)
-            elif cfg_name == "distill":
-                total = total + align(z, target)
-            # baseline = recon + dyn only
+            if sfa is not None: total = total + sfa(z)
+            if causal is not None: total = total + causal(z)
+            if lyap is not None: total = total + lyap(z)
+            if align is not None and target is not None: total = total + align(z, target)
 
             optim.zero_grad()
             total.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
 
-    # Eval on held-out
     model.eval()
     with torch.no_grad():
         t = torch.from_numpy(held_out).permute(0, 3, 1, 2).float().to(device)
@@ -135,11 +152,11 @@ def main():
     print(f"DISTILLATION EXPERIMENT — {N_SEEDS} seeds × 3 configs × held-out double_pendulum")
     print("=" * 75)
 
-    configs = ["baseline", "phase_c", "distill"]
+    configs = list(CONFIGS.keys())
     results = {c: [] for c in configs}
     t0 = time.time()
     n_done = 0
-    n_total = N_SEEDS * 3
+    n_total = N_SEEDS * len(configs)
     for seed in range(N_SEEDS):
         for cfg in configs:
             n_done += 1
@@ -189,29 +206,32 @@ def main():
     print("=" * 75)
     base_scores = [r["dna_score"] for r in results["baseline"]]
     tests = {}
-    for cfg in ["phase_c", "distill"]:
+    for cfg in configs:
+        if cfg == "baseline":
+            continue
         cfg_scores = [r["dna_score"] for r in results[cfg]]
         t, p = welch(cfg_scores, base_scores)
         sig = "yes (*)" if p < 0.05 else "no"
-        print(f"  {cfg:<12}vs baseline:  t={t:>+8.3f}  p={p:>.4f}  {sig}")
+        print(f"  {cfg:<24}vs baseline:  t={t:>+8.3f}  p={p:>.4f}  {sig}")
         tests[f"{cfg}_vs_baseline"] = {"t": t, "p": p, "significant": p < 0.05}
 
-    # Per-axis decomposition for distill vs baseline
-    print("\n" + "=" * 75)
-    print("PER-AXIS DELTA (distill mean − baseline mean)")
-    print("=" * 75)
+    # Per-axis decomposition for all configs vs baseline
+    print("\n" + "=" * 95)
+    print("PER-AXIS MEAN (config across seeds)")
+    print("=" * 95)
     axes_keys = list(results["baseline"][0]["dna_axes"].keys())
-    print(f"{'axis':<22}{'baseline':>12}{'distill':>12}{'delta':>14}")
-    print("-" * 60)
-    per_axis = {}
+    header = f"{'axis':<22}" + "".join(f"{c[:12]:>14}" for c in configs)
+    print(header)
+    print("-" * 95)
+    per_axis = {ax: {} for ax in axes_keys}
     for ax in axes_keys:
-        b_vals = [r["dna_axes"][ax] for r in results["baseline"]]
-        d_vals = [r["dna_axes"][ax] for r in results["distill"]]
-        b_mean = float(np.mean(b_vals))
-        d_mean = float(np.mean(d_vals))
-        delta = d_mean - b_mean
-        per_axis[ax] = {"baseline_mean": b_mean, "distill_mean": d_mean, "delta": delta}
-        print(f"{ax:<22}{b_mean:>12.4f}{d_mean:>12.4f}{delta:>+14.4f}")
+        row_str = f"{ax:<22}"
+        for cfg in configs:
+            vals = [r["dna_axes"][ax] for r in results[cfg]]
+            mean_v = float(np.mean(vals))
+            per_axis[ax][cfg] = mean_v
+            row_str += f"{mean_v:>14.4f}"
+        print(row_str)
 
     # Save artifact
     Path("results").mkdir(exist_ok=True)
