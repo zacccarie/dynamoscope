@@ -17,6 +17,7 @@ dependencies = [
     "pywavelets>=1.9",
     "tigramite>=5.2",
     "pysindy>=2.1",
+    "ssqueezepy>=0.6",
 ]
 
 [tool.setuptools]

@@ -36,6 +36,7 @@ from .registry import (
 )
 from .sfa import slow_feature_analysis
 from .wavelets import wavelet_per_dim
+from .scattering import scattering_per_dim
 from .benchmark import benchmark_summary
 from .sindy import fit_sindy
 from .spectral import dmd, power_spectrum
@@ -771,6 +772,31 @@ def benchmark_endpoint(cache_key: str, dt: float = 1.0) -> JSONResponse:
         latents = latents[:, keep]
     t0 = time.time()
     out = benchmark_summary(latents, dt=dt)
+    out["compute_s"] = round(time.time() - t0, 3)
+    return JSONResponse(out)
+
+
+@app.post("/api/scattering/{cache_key}")
+def scattering_endpoint(
+    cache_key: str, J: int = 5, Q: int = 8, order: int = 2,
+) -> JSONResponse:
+    """Mallat 1D scattering transform via ssqueezepy CWT.
+
+    Order 0 = lowpass. Order 1 = |CWT|. Order 2 = ||CWT|CWT|.
+    Translation-invariant + Lipschitz-stable multi-scale features.
+
+    Args:
+        J : max scale = 2^J
+        Q : voices per octave
+        order : 0 | 1 | 2 (deep hierarchy)
+    """
+    if cache_key not in _LATENTS_CACHE:
+        raise HTTPException(status_code=404, detail="No cached latents")
+    latents = _LATENTS_CACHE[cache_key]
+    if latents.shape[0] < 64:
+        raise HTTPException(status_code=400, detail="Need >= 64 samples for scattering")
+    t0 = time.time()
+    out = scattering_per_dim(latents, J=J, Q=Q, order=order)
     out["compute_s"] = round(time.time() - t0, 3)
     return JSONResponse(out)
 
