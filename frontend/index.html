@@ -519,7 +519,15 @@
     </div>
     <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 10px; letter-spacing: 0.14em;">entropy ladder</div>
     <div id="ladder"></div>
-    <div class="panel-actions"><button id="spectralBtn" title="DMD/Koopman spectrum (modes oscillants), power spectrum FFT, multiscale entropy ladder. Révèle structures périodiques + scaling.">compute spectral</button></div>
+    <div class="panel-actions">
+      <button id="spectralBtn" title="DMD/Koopman spectrum (modes oscillants), power spectrum FFT, multiscale entropy ladder. Révèle structures périodiques + scaling.">compute spectral</button>
+      <button id="waveletsBtn" style="margin-top: 6px; color: var(--magenta); border-color: var(--magenta);" title="Décomposition wavelet multi-résolution (PyWavelets DWT, db4 default). Énergie par échelle = signature multi-scale Mallat-style.">compute wavelets</button>
+    </div>
+    <div id="waveletResult" style="display:none; margin-top: 8px;">
+      <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin-bottom: 4px;">WAVELET ENERGY · DWT db4</div>
+      <div id="waveletBars"></div>
+      <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 4px;">dominant scale · <span id="waveletDom" style="color: var(--magenta);">—</span></div>
+    </div>
   </div>
 
   <!-- Causal -->
@@ -2470,6 +2478,29 @@ async function computeSpectral() {
   } catch (err) { setStatus('spec error: ' + err.message); }
 }
 document.getElementById('spectralBtn').addEventListener('click', computeSpectral);
+
+document.getElementById('waveletsBtn').addEventListener('click', async () => {
+  if (!videoCacheKey) { setStatus('upload video first'); return; }
+  setStatus('computing wavelets…', true);
+  try {
+    const r = await fetch(`/api/wavelets/${videoCacheKey}?wavelet=db4`, { method: 'POST' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    document.getElementById('waveletResult').style.display = 'block';
+    document.getElementById('waveletDom').textContent = `${d.global_dominant_scale} / ${d.n_levels}`;
+    const host = document.getElementById('waveletBars');
+    host.innerHTML = '';
+    const eMax = Math.max(...d.energy_normalized, 1e-6);
+    d.energy_normalized.forEach((e, i) => {
+      const w = Math.max(2, Math.round((e / eMax) * 160));
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `<span class="lbl">s${i+1}</span><span class="ebar" style="width:${w}px;"></span><span class="val">${(e*100).toFixed(1)}%</span>`;
+      host.appendChild(row);
+    });
+    setStatus(`wavelets · dominant=s${d.global_dominant_scale} · ${d.compute_s}s`);
+  } catch (err) { setStatus('wavelets error: ' + err.message); }
+});
 
 // ─── Causal ────────────────────────────────────────────────
 const causalCanvas = document.getElementById('causalCanvas');

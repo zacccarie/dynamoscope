@@ -33,6 +33,7 @@ from .registry import (
     delete_experiment, get_experiment, list_experiments, save_experiment,
 )
 from .sfa import slow_feature_analysis
+from .wavelets import wavelet_per_dim
 from .sindy import fit_sindy
 from .spectral import dmd, power_spectrum
 from .systems import SYSTEMS, list_systems
@@ -654,6 +655,24 @@ def evolution_endpoint(cache_key: str, window: int = 24, stride: int = 8) -> JSO
     latents = _LATENTS_CACHE[cache_key]
     t0 = time.time()
     out = evolution_pipeline(latents, window=window, stride=stride)
+    out["compute_s"] = round(time.time() - t0, 3)
+    return JSONResponse(out)
+
+
+@app.post("/api/wavelets/{cache_key}")
+def wavelets_endpoint(
+    cache_key: str, wavelet: str = "db4", max_level: int | None = None,
+) -> JSONResponse:
+    """Multi-resolution wavelet decomposition (PyWavelets DWT).
+
+    Choices wavelet : db4 (default), haar, sym8, coif5.
+    Returns energy per scale + dominant scale (Mallat-style multi-scale signature).
+    """
+    if cache_key not in _LATENTS_CACHE:
+        raise HTTPException(status_code=404, detail="No cached latents")
+    latents = _LATENTS_CACHE[cache_key]
+    t0 = time.time()
+    out = wavelet_per_dim(latents, wavelet=wavelet, max_level=max_level)
     out["compute_s"] = round(time.time() - t0, 3)
     return JSONResponse(out)
 
