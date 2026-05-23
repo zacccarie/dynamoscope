@@ -1,5 +1,7 @@
 # DYNAMOSCOPE
 
+![tests](https://github.com/zaccarie/dynamoscope/actions/workflows/test.yml/badge.svg)
+
 Video → latent trajectory → emergence analysis.
 
 Experimental research tool to extract emergent structures, causal dynamics, and multi-scale patterns from video by treating it as a trajectory through state space.
