@@ -207,6 +207,44 @@ def cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_benchmark_models(args: argparse.Namespace) -> int:
+    """Run cross-model benchmark sur N videos × M models."""
+    from .benchmark_models import cross_model_benchmark, render_leaderboard
+    from .models.registry import MODEL_REGISTRY
+
+    folder = Path(args.folder)
+    if not folder.exists():
+        print(f"[benchmark] folder not found: {folder}", file=sys.stderr)
+        return 1
+    exts = {".mp4", ".mov", ".webm", ".avi", ".mkv"}
+    videos = sorted([p for p in folder.iterdir() if p.suffix.lower() in exts])
+    if not videos:
+        print(f"[benchmark] no videos in {folder}", file=sys.stderr)
+        return 1
+
+    if args.models:
+        model_names = args.models
+    else:
+        # Default : all encoders, skip stubs
+        model_names = [n for n in MODEL_REGISTRY.keys() if not n.endswith("_stub")]
+
+    print(f"[benchmark] {len(videos)} videos × {len(model_names)} models", file=sys.stderr)
+    print(f"[benchmark] models: {model_names}", file=sys.stderr)
+
+    result = cross_model_benchmark(
+        videos, model_names, max_frames=args.max_frames,
+        reducer=args.reducer, skip_stubs=True,
+    )
+
+    if args.out:
+        Path(args.out).write_text(json.dumps(result, indent=2))
+        print(f"[benchmark] saved → {args.out}", file=sys.stderr)
+
+    print(file=sys.stderr)
+    print(render_leaderboard(result), file=sys.stderr)
+    return 0
+
+
 def cmd_system(args: argparse.Namespace) -> int:
     """Generate + analyse trajectoire système synthétique."""
     if args.system_id not in SYSTEMS:
@@ -274,6 +312,15 @@ def main(argv: list[str] | None = None) -> int:
     p_sys.add_argument("--out", type=str, default=None)
     p_sys.add_argument("--analyses", nargs="+", default=["all"])
     p_sys.set_defaults(func=cmd_system)
+
+    p_bench = sub.add_parser("benchmark-models", help="Cross-model benchmark N videos × M models")
+    p_bench.add_argument("folder", type=str, help="Folder with videos")
+    p_bench.add_argument("--models", nargs="+", default=None,
+                         help="Model names (default: all encoders)")
+    p_bench.add_argument("--max-frames", type=int, default=60, dest="max_frames")
+    p_bench.add_argument("--reducer", default="umap")
+    p_bench.add_argument("--out", type=str, default=None)
+    p_bench.set_defaults(func=cmd_benchmark_models)
 
     args = p.parse_args(argv)
     return args.func(args)
