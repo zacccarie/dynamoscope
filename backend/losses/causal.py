@@ -70,12 +70,12 @@ class CausalSparsityLoss(nn.Module):
         ones = torch.ones(X.shape[0], 1, device=z.device, dtype=z.dtype)
         Xb = torch.cat([X, ones], dim=1)  # (T-order, D*order+1)
 
-        # Least-squares closed-form via torch.linalg.lstsq (differentiable backwards)
-        # Beta : (D*order+1, D)
-        result = torch.linalg.lstsq(Xb, Y)
-        beta = result.solution  # may be (D*order+1, D) or padded; handle both
-        if beta.shape[0] != Xb.shape[1]:
-            beta = beta[: Xb.shape[1]]
+        # Normal equations + ridge pour stabilité + compatibilité MPS
+        # beta = (Xb^T Xb + λI)^-1 Xb^T Y
+        XtX = Xb.transpose(0, 1) @ Xb
+        ridge = 1e-3 * torch.eye(XtX.shape[0], device=z.device, dtype=z.dtype)
+        XtY = Xb.transpose(0, 1) @ Y
+        beta = torch.linalg.solve(XtX + ridge, XtY)
 
         Y_pred = Xb @ beta
         fit_err = ((Y - Y_pred) ** 2).mean()
