@@ -1,11 +1,26 @@
-"""Segmentation temporelle : detection de boundaries via peaks de velocite perceptuelle.
-Algos : percentile-threshold, prominence-based, adaptive (median-MAD)."""
+"""Détection automatique de shot/event boundaries dans vidéo.
+
+Principe : peaks de vélocité perceptuelle (cosine distance frame-à-frame dans
+espace latent original 2048d) = transitions sémantiques abruptes = cuts/dissolves/morphs.
+
+3 méthodes seuil :
+- adaptive : median + sens × MAD (robuste outliers)
+- std : mean + sens × std (gaussian assumption)
+- percentile : top X% (simple)
+
+Output : segments [start, end) + boundaries indices.
+"""
 from __future__ import annotations
 import numpy as np
 
 
 def perceptual_velocity_cosine(latents: np.ndarray) -> np.ndarray:
-    """Vitesse perceptuelle = cosine distance frame-a-frame."""
+    """Vélocité perceptuelle : v[t] = 1 - cos(z[t], z[t-1]).
+
+    Cosine distance ∈ [0, 2] : 0 = identique, 1 = orthogonal, 2 = opposé.
+    Insensible à la magnitude des features (ne dépend que de la direction).
+    Mesure mieux la "nouveauté visuelle" que distance euclidienne.
+    """
     norms = np.linalg.norm(latents, axis=1, keepdims=True)
     norms = np.maximum(norms, 1e-9)
     units = latents / norms
@@ -15,7 +30,11 @@ def perceptual_velocity_cosine(latents: np.ndarray) -> np.ndarray:
 
 
 def detect_peaks(velocity: np.ndarray, threshold: float, min_distance: int = 3) -> list[int]:
-    """Trouve indices ou velocity > threshold avec contrainte de separation minimale."""
+    """Trouve indices où velocity[i] ≥ threshold AVEC séparation min entre peaks.
+
+    Si 2 peaks consécutifs trop proches, garde seulement premier (évite double-detection
+    d'une même transition).
+    """
     peaks: list[int] = []
     last = -min_distance - 1
     for i, v in enumerate(velocity):
@@ -31,11 +50,18 @@ def find_boundaries(
     sensitivity: float = 1.0,
     min_segment: int = 4,
 ) -> dict:
-    """Détection de boundaries par analyse de velocity.
-    Methods :
-      - 'percentile' : seuil = (95 - 10*sens) percentile
-      - 'adaptive'   : median + sensitivity * MAD (median absolute deviation)
-      - 'std'        : mean + sensitivity * std
+    """Pipeline : latents → vélocités → seuil → boundaries → segments.
+
+    Méthodes :
+    - 'adaptive' (robuste) : threshold = median + sens × 2.5 × MAD (Median Absolute Deviation)
+                              MAD = écart-type robuste, insensible outliers
+    - 'std' : threshold = mean + sens × std (gaussian)
+    - 'percentile' : threshold = (95 - 10·sens)e percentile
+
+    Petits segments (< min_segment) sont fusionnés avec précédent pour éviter
+    sur-segmentation.
+
+    Returns: segments list + boundaries + velocity profile + threshold info.
     """
     velocity = perceptual_velocity_cosine(latents)
     n = len(velocity)

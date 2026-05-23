@@ -1,4 +1,9 @@
-"""Experiment registry : SQLite log de runs + artifacts trajectoires/metrics."""
+"""Experiment registry : persiste runs avec metadata SQLite + payload JSON disque.
+
+Permet reload de runs passés, comparaison historique, archive recherche.
+Architecture hybride : SQLite pour query rapide (list/search/filter) +
+fichiers JSON pour payloads complets (coords, raw_coords, metrics).
+"""
 from __future__ import annotations
 import json
 import sqlite3
@@ -13,6 +18,7 @@ DB_PATH = ROOT / "cache" / "experiments.db"
 
 
 def _conn() -> sqlite3.Connection:
+    """Connection helper : crée dossier parent + active row_factory pour dict-style access."""
     DB_PATH.parent.mkdir(exist_ok=True)
     c = sqlite3.connect(str(DB_PATH))
     c.row_factory = sqlite3.Row
@@ -20,6 +26,7 @@ def _conn() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    """Crée table experiments si pas existante. Schéma : id PK + metadata + payload_path."""
     with _conn() as c:
         c.execute("""
         CREATE TABLE IF NOT EXISTS experiments (
@@ -44,7 +51,12 @@ def save_experiment(
     encoder: str | None = None,
     tags: list[str] | None = None,
 ) -> str:
-    """Persiste un run. payload = full bundle JSON (coords + metrics)."""
+    """Persiste un run dans registry.
+
+    Stratégie : metadata légère en SQLite + payload JSON sur disque.
+    UUID hex 12-chars = ID stable cross-session.
+    Returns: exp_id (string) pour reference future.
+    """
     init_db()
     exp_id = uuid.uuid4().hex[:12]
     now = time.time()
@@ -66,6 +78,7 @@ def save_experiment(
 
 
 def list_experiments(limit: int = 50) -> list[dict]:
+    """Liste runs ordrés par date desc (plus récent premier). Metadata seule, pas payload."""
     init_db()
     with _conn() as c:
         rows = c.execute(
@@ -89,6 +102,11 @@ def list_experiments(limit: int = 50) -> list[dict]:
 
 
 def get_experiment(exp_id: str) -> dict | None:
+    """Récupère payload complet d'un run (coords, raw_coords, metrics, etc.).
+
+    Lit le fichier JSON sur disque pointé par payload_path en DB.
+    Returns None si exp_id inconnu ou fichier orphelin.
+    """
     init_db()
     with _conn() as c:
         row = c.execute(
@@ -103,6 +121,7 @@ def get_experiment(exp_id: str) -> dict | None:
 
 
 def delete_experiment(exp_id: str) -> bool:
+    """Supprime run du registry + fichier payload disque. Returns True si trouvé/supprimé."""
     init_db()
     with _conn() as c:
         row = c.execute(

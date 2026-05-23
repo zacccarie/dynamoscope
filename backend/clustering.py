@@ -13,8 +13,16 @@ def cluster_latents(
     metric: str = "euclidean",
     normalize_vectors: bool = True,
 ) -> dict:
-    """HDBSCAN sur latents. Retourne labels + stats par cluster.
-    label = -1 -> bruit / non-classe."""
+    """HDBSCAN auto-clustering (Campello-Moulavi-Sander 2013) sur latents originaux.
+
+    Avantages vs k-means :
+    - Pas de k à choisir
+    - Trouve clusters densité variable
+    - Identifie outliers (label = -1) au lieu de forcer assignment
+
+    L2-normalisation préalable rend distance euclidienne ≈ cosine sur sphère unité.
+    `min_cluster_size` : seuil min pour qu'un cluster soit reconnu (sinon → bruit).
+    """
     n = latents.shape[0]
     X = normalize(latents) if normalize_vectors else latents.astype(np.float64)
 
@@ -69,8 +77,16 @@ def cluster_latents(
 
 
 def transition_matrix(labels: list[int], include_noise: bool = False) -> dict:
-    """Compte transitions cluster[t] -> cluster[t+1].
-    Retourne matrice + temps total par cluster + sequence."""
+    """Construit chaîne de Markov des transitions inter-clusters.
+
+    Pour chaque paire (cluster[t], cluster[t+1]), incrément count.
+    Matrice M[i,j] = nombre de transitions de cluster i vers cluster j.
+
+    Carry-forward sur frames noise (-1) pour continuité narrative.
+    Sequence_unique = succession ordonnée des clusters visités (sans répétitions consécutives).
+
+    Lien : Markov chain transitions = signature narrative structurelle de la vidéo.
+    """
     arr = np.asarray(labels)
     if not include_noise:
         # Pour transitions, remplace -1 par cluster precedent (carry-forward)

@@ -1,6 +1,18 @@
-"""Slow Feature Analysis (Wiskott & Sejnowski 2002).
-Extract linear projections de latents qui changent le PLUS LENTEMENT dans temps.
-= invariants temporels = signal stable identitaire."""
+"""Slow Feature Analysis (Wiskott-Sejnowski 2002).
+
+Inspiration biologique : cellules visuelles complexes extraient invariances
+(identité d'objet préservée à travers rotation, translation, scale).
+
+Principe SFA : trouve combinaisons linéaires W·X qui changent LE PLUS LENTEMENT
+dans temps. Minimise <(dWX/dt)²> sous contrainte W·X unit variance + decorrelated.
+
+Output = composantes ordonnées par slowness :
+- λ₁ petit = signal le plus lent = identité globale
+- λ_k grand = signal rapide = bruit/détails transitoires
+
+Lien causal emergence (Hoel) : composantes lentes = macro-états qui peuvent
+avoir effective info supérieure aux micro-états.
+"""
 from __future__ import annotations
 import numpy as np
 from scipy.linalg import eigh
@@ -11,12 +23,19 @@ def slow_feature_analysis(
     n_components: int = 8,
     polynomial_expand: int = 1,
 ) -> dict:
-    """SFA classique. Retourne :
-      - slow_features : (N, k) signal projeté sur k axes les plus lents
-      - lambdas : valeurs propres (petit = lent)
-      - mixing matrix : projection latents → slow features
-      - slowness : <(ẏ)²> par feature (smaller = slower)
-    polynomial_expand=2 ajoute termes quadratiques (z_i z_j) — version non-lineaire."""
+    """Pipeline SFA via generalized eigenvalue problem.
+
+    Étapes :
+    1. Center X (zero mean per dim)
+    2. (Optionnel) Polynomial expansion order 2 → SFA non-linéaire (quadratique)
+    3. Whitening : sphericize covariance via eigh
+    4. Compute time derivatives dY/dt (central diff)
+    5. Eigendecompose Cov(dY) → lambdas + R
+    6. k smallest lambdas = k slowest features
+
+    polynomial_expand=2 ajoute z_i × z_j → permet capturer invariances quadratiques
+    (e.g., rotations, scaling-equivariance).
+    """
     n, d = latents.shape
     if n < 8:
         raise ValueError("Trajectory too short")

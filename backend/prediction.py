@@ -1,5 +1,16 @@
-"""Prédiction trajectoire latente : f(z[t]) -> z[t+1].
-Mesure surprise = prediction error. Lien world models + free energy + JEPA."""
+"""Prédiction trajectoire latente : world model minimal en espace latent.
+
+Architecture : MLP résiduel z[t+1] = z[t] + g(z[t]) où g = 2-layer NN.
+Apprend dynamique latente par minimisation MSE z_pred[t+1] vs z_true[t+1].
+
+Surprise per-frame = ‖z_pred - z_true‖ = signal pour :
+- Free energy minimization (Friston) — frames "imprévues" = high surprise
+- Anomaly detection — outliers narratifs
+- Predictive coding — modèle interne du système
+
+Rollout multi-step = imagination du futur en latent space (Dreamer style).
+Counterfactual = "et si les conditions initiales étaient un peu différentes ?"
+"""
 from __future__ import annotations
 import numpy as np
 import torch
@@ -7,7 +18,12 @@ import torch.nn as nn
 
 
 class LatentMLP(nn.Module):
-    """MLP 2-couches pour prédire next latent depuis current."""
+    """Predictor résiduel : z[t+1] = z[t] + MLP(z[t]).
+
+    Forme résiduelle critique : apprend juste DELTA, plus stable que prédire z[t+1] from scratch.
+    Architecture : Linear(d, hidden) → GELU → Linear(hidden, d).
+    GELU vs ReLU : plus smooth, meilleur gradient flow.
+    """
     def __init__(self, dim: int, hidden: int = 256):
         super().__init__()
         h = min(hidden, dim)
@@ -26,7 +42,14 @@ def train_model(
     latents: np.ndarray, epochs: int = 150, lr: float = 1e-3,
     hidden: int = 256, device: str = "cpu",
 ) -> tuple[LatentMLP, torch.Tensor, torch.Tensor]:
-    """Train et retourne (model, mean, std) pour reuse."""
+    """Entraîne LatentMLP sur (z[:-1] → z[1:]) pairs avec AdamW.
+
+    Standardisation critique : centre + unit variance par dim.
+    Weight decay 1e-4 = régularisation L2 anti-overfit.
+    150 epochs typique convergence pour 80-200 frames Mandelbrot.
+
+    Returns (model, mean, std) pour re-use sans réentraîner (rollout, counterfactual).
+    """
     n, d = latents.shape
     x = torch.from_numpy(latents[:-1]).float().to(device)
     y = torch.from_numpy(latents[1:]).float().to(device)
@@ -48,6 +71,12 @@ def train_model(
 
 
 def _project_via_knn(pred_arr: np.ndarray, all_latents: np.ndarray, coords_3d: np.ndarray, k: int = 5) -> list[list[float]]:
+    """Projette latent prédit en 3D via k-NN weighted softmax sur cached latents.
+
+    Évite re-fit UMAP (couteux + non-déterministe).
+    Méthode : trouve k voisins cosine du prédit dans cached latents,
+    moyenne pondérée de leurs coords 3D (softmax sur sims × 10).
+    """
     all_norm = all_latents / np.maximum(np.linalg.norm(all_latents, axis=1, keepdims=True), 1e-9)
     pred_norm = pred_arr / np.maximum(np.linalg.norm(pred_arr, axis=1, keepdims=True), 1e-9)
     k_eff = min(k, all_latents.shape[0])
@@ -74,7 +103,18 @@ def counterfactual_rollouts(
     device: str = "cpu",
     seed: int = 42,
 ) -> dict:
-    """Cone of futures : N rollouts depuis latent perturbé. Visualise diversité MLP imaginaire."""
+    """Génère "cone of futures" : N trajectoires imaginées depuis latents perturbés.
+
+    Pour chaque sample :
+    1. Perturbe z[start_idx] avec Gaussian noise σ × std(latents)
+    2. Rollout iterative H steps via MLP
+    3. Projette ghost en 3D via k-NN weighted
+
+    Divergence du cone = sensibilité conditions initiales = exposant Lyapunov empirique.
+    Cone compact → système stable. Cone explose → chaos local.
+
+    Lien direct active inference (Friston) : agent imagine futurs pour choisir action.
+    """
     n, d = latents.shape
     if not (0 <= start_idx < n - 1):
         raise ValueError("Invalid start_idx")
@@ -119,8 +159,11 @@ def rollout(
     hidden: int = 256,
     device: str = "cpu",
 ) -> dict:
-    """Rollout MLP itératif depuis start_idx. Projette ghost en 3D via k-NN weighted.
-    Compare aussi à trajectoire réelle si disponible."""
+    """Single rollout déterministe : MLP itère depuis z[start_idx] sur H steps.
+
+    Compare ghost vs actual : step_errors[k] = ‖pred[k] - actual[start+k+1]‖.
+    Croissance step_errors = horizon prédictif → divergence Lyapunov-like.
+    """
     n, d = latents.shape
     if not (0 <= start_idx < n - 1):
         raise ValueError(f"start_idx {start_idx} out of [0, {n-1})")
@@ -176,7 +219,14 @@ def fit_predictor(
     hidden: int = 256,
     device: str = "cpu",
 ) -> dict:
-    """Train MLP minimal sur trajectoire. Retourne predictions + errors."""
+    """Pipeline complet : train + inference + métriques predictability.
+
+    Compute per-frame surprise + baseline (predict identity) + predictability ratio.
+    predictability = 1 - mean(MLP_error) / mean(identity_baseline_error).
+    1.0 = parfait. 0.0 = pas mieux que trivial. < 0 = pire que trivial.
+
+    Returns loss_curve, surprise array, comparative metrics.
+    """
     n, d = latents.shape
     if n < 8:
         raise ValueError("Trajectory too short")

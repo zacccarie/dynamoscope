@@ -284,7 +284,7 @@
     <div class="section-title">video input</div>
     <div class="field">
       <label>encoder</label>
-      <select id="encoderSel">
+      <select id="encoderSel" title="Encoder : transforme chaque frame en vecteur features. ResNet50/ViT-B = supervised ImageNet, biais classes. DINOv2 = self-supervised, sans biais. CLIP = espace partagé avec texte pour query sémantique.">
         <option value="resnet50">ResNet50 · 2048d · ImageNet supervised</option>
         <option value="vit_b_16">ViT-B/16 · 768d · ImageNet supervised</option>
         <option value="dinov2_vits14">DINOv2-S · 384d · self-supervised</option>
@@ -293,11 +293,11 @@
     </div>
     <div class="field">
       <label>max frames</label>
-      <input id="maxFrames" type="number" value="150" min="30" max="500" step="10" />
+      <input id="maxFrames" type="number" value="150" min="30" max="500" step="10" title="Nombre de frames échantillonnées uniformément le long de la vidéo. 30=quick preview, 500=détaillé. Plus de frames = plus lent + meilleur qualité analyses." />
     </div>
     <div class="field">
       <label>reducer</label>
-      <select id="reducerSel">
+      <select id="reducerSel" title="Algo réduction dimensionnelle. UMAP = non-linéaire topologique (clusters visibles, distances déformées). PCA = linéaire isométrique (distances préservées, structures aplaties). Isomap = géodésique k-NN (compromis).">
         <option value="umap">UMAP · non-linéaire topologique</option>
         <option value="pca">PCA · linéaire isométrique</option>
         <option value="isomap">Isomap · géodésique k-NN</option>
@@ -310,21 +310,21 @@
     <div class="slider-field">
       <label>n_neighbors</label>
       <span class="val" id="nnVal">15</span>
-      <input type="range" class="param-slider" id="paramNN" min="2" max="60" value="15" step="1" />
+      <input type="range" class="param-slider" id="paramNN" min="2" max="60" value="15" step="1" title="n_neighbors UMAP : taille voisinage local considéré. Petit (5-10) = capture détails micro. Grand (30+) = privilégie structure globale, trajectoires plus lisses." />
     </div>
     <div class="slider-field">
       <label>min_dist</label>
       <span class="val" id="mdVal">0.10</span>
-      <input type="range" class="param-slider" id="paramMD" min="0" max="100" value="10" step="1" />
+      <input type="range" class="param-slider" id="paramMD" min="0" max="100" value="10" step="1" title="min_dist UMAP : compacité des clusters. 0 = clusters serrés (frontières nettes), 1 = distribution uniforme dans l'espace (pas de clusters apparents)." />
     </div>
     <div class="slider-field">
       <label>smoothing window</label>
       <span class="val" id="smVal">0</span>
-      <input type="range" class="param-slider" id="paramSM" min="0" max="20" value="0" step="1" />
+      <input type="range" class="param-slider" id="paramSM" min="0" max="20" value="0" step="1" title="Smoothing window : moyenne glissante temporelle post-projection. Lisse les jumps artefactuels d'UMAP. 0 = brut, >5 = trajectoire très lissée." />
     </div>
     <div class="field">
       <label>metric</label>
-      <select id="paramMetric">
+      <select id="paramMetric" title="Métrique de distance UMAP. Cosine = angle (insensible magnitude). Euclidean = distance brute. Manhattan = somme |dx_i|. Correlation = similitude pattern.">
         <option value="cosine">cosine</option>
         <option value="euclidean">euclidean</option>
         <option value="manhattan">manhattan</option>
@@ -338,7 +338,7 @@
       <div style="font-family: var(--mono); font-size: 9px; color: var(--plasma); letter-spacing: 0.16em; margin-bottom: 6px;">AUTO-TUNE</div>
       <div class="field">
         <label>objective</label>
-        <select id="autotuneObj">
+        <select id="autotuneObj" title="Objectif à maximiser. Composite = équilibre tout. Faithfulness = préserver k-NN structure. Continuity = trajectoire lisse. Spread = utiliser tout l'espace.">
           <option value="composite">composite · faith + cont + spread</option>
           <option value="faithfulness">faithfulness · k-NN preservation</option>
           <option value="continuity">continuity · temporal smooth</option>
@@ -352,21 +352,21 @@
           <option value="random">random search · uniform</option>
         </select>
       </div>
-      <button id="autotuneBtn" style="color: var(--plasma); border-color: var(--plasma);">auto-tune · 20 trials</button>
+      <button id="autotuneBtn" style="color: var(--plasma); border-color: var(--plasma);" title="Lance 20 essais de params UMAP différents et applique la meilleure configuration trouvée selon l'objectif sélectionné.">auto-tune · 20 trials</button>
       <div id="autotuneResult" style="font-size: 9px; color: rgba(255,255,255,0.6); line-height: 1.5; margin-top: 8px; display: none;"></div>
     </div>
     <label class="filebtn" style="display:block;">
       <input type="file" id="fileInput" accept="video/*" />
       <button onclick="document.getElementById('fileInput').click()">upload video</button>
     </label>
-    <button id="liveBtn" style="margin-top:6px; color:#ff66cc; border-color:#ff66cc;">live · webcam ●</button>
+    <button id="liveBtn" style="margin-top:6px; color:#ff66cc; border-color:#ff66cc;" title="Active webcam : encode chaque frame en live (1.5s interval), trajectoire grandit en temps réel.">live · webcam ●</button>
   </div>
 
   <div class="section">
     <div class="section-title">synthetic system</div>
     <div class="field">
       <label>type</label>
-      <select id="systemSel">
+      <select id="systemSel" title="Systèmes dynamiques canoniques pour démo/benchmark : Lorenz (chaos 3D), Rössler (single funnel), Van der Pol (limit cycle), Hénon (map discret), Logistic (period doubling), double pendulum (Hamiltonian).">
         <option value="lorenz">Lorenz · chaotic 3D</option>
         <option value="rossler">Rössler · funnel</option>
         <option value="van_der_pol">Van der Pol · limit cycle</option>
@@ -375,7 +375,7 @@
         <option value="double_pendulum">Double pendulum · Hamiltonian</option>
       </select>
     </div>
-    <button class="alt" id="demoBtn">load system</button>
+    <button class="alt" id="demoBtn" title="Génère trajectoire du système dynamique sélectionné. Permet tester pipeline avec ground truth connue.">load system</button>
   </div>
 
   <div class="section">
@@ -399,7 +399,7 @@
     <div class="section-title">view mode</div>
     <div class="field">
       <label>projection</label>
-      <select id="viewMode">
+      <select id="viewMode" title="Représentation du temps dans l'espace 3D. Phase space = brut. Time helix = Z=temps (révèle récurrences). Takens = embedding depuis 1 scalaire. Polar = angle=temps. Audio = trajectoire wav2vec2. SFA = composantes les plus lentes.">
         <option value="phase_space">phase space · direct 3D</option>
         <option value="time_helix">time helix · z=t</option>
         <option value="takens_delay">Takens · (s,s+τ,s+2τ)</option>
@@ -411,7 +411,7 @@
     <div class="slider-field" id="tauField" style="display:none;">
       <label>delay τ</label>
       <span class="val" id="tauVal">5</span>
-      <input type="range" class="param-slider" id="paramTau" min="1" max="40" value="5" step="1" />
+      <input type="range" class="param-slider" id="paramTau" min="1" max="40" value="5" step="1" title="Delay τ pour Takens embedding. Idéalement = premier minimum de mutual info. Petit τ = points très corrélés. Grand τ = embedding plus 'déplié'." />
     </div>
     <div id="viewModeDesc" style="font-size: 9px; color: rgba(255,255,255,0.45); line-height: 1.4; margin-top: 4px;">
       Direct 3D : trajectoire dans espace réduit, temps = ordre.
@@ -422,7 +422,7 @@
     <div class="section-title">color mode</div>
     <div class="field">
       <label>map</label>
-      <select id="colorMode">
+      <select id="colorMode" title="Encodage couleur des points. Time = position temporelle. Velocity UMAP = vitesse dans projection 3D (avec artefacts). Velocity perceptual = vraie nouveauté visuelle. Cluster = labels HDBSCAN. Surprise = erreur prédiction MLP.">
         <option value="time">time · cyan→magenta→amber</option>
         <option value="velocity_umap">velocity · UMAP projection</option>
         <option value="velocity_perceptual">velocity · perceptual (true)</option>
@@ -442,11 +442,11 @@
   <div class="section">
     <div class="section-title">workspace</div>
     <div class="btn-row">
-      <button class="muted" id="saveBtn">save</button>
-      <button class="muted" id="exportBtn">export</button>
+      <button class="muted" id="saveBtn" title="Sauvegarde run actuel dans registry SQLite. Reloadable via History.">save</button>
+      <button class="muted" id="exportBtn" title="Télécharge bundle JSON complet (coords + metrics + metadata) pour analyse externe.">export</button>
     </div>
-    <button class="muted" id="histToggle" style="margin-top:6px;">history</button>
-    <button id="compareBtn" style="margin-top:6px; color: var(--plasma); border-color: var(--plasma);">overlay another run</button>
+    <button class="muted" id="histToggle" style="margin-top:6px;" title="Liste tous les runs sauvegardés. Click sur un run = reload sa trajectoire.">history</button>
+    <button id="compareBtn" style="margin-top:6px; color: var(--plasma); border-color: var(--plasma);" title="Superpose trajectoire d'un run sauvegardé sur celle courante. Shared UMAP fit pour distances comparables.">overlay another run</button>
     <button id="clearOverlayBtn" style="margin-top:6px; color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.2); display:none;">clear overlay</button>
   </div>
 </div>
@@ -490,7 +490,7 @@
     </div>
     <canvas id="recCanvas" class="analysis-canvas"></canvas>
     <div class="panel-caption">recurrence plot</div>
-    <div class="panel-actions"><button id="computeBtn">compute dynamics</button></div>
+    <div class="panel-actions"><button id="computeBtn" title="Calcule Lyapunov exponent (chaos), correlation dim (effective dimension), RQA stats (recurrence rate, determinism, laminarity) et recurrence plot.">compute dynamics</button></div>
   </div>
 
   <!-- Spectral -->
@@ -505,7 +505,7 @@
     </div>
     <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 10px; letter-spacing: 0.14em;">entropy ladder</div>
     <div id="ladder"></div>
-    <div class="panel-actions"><button id="spectralBtn">compute spectral</button></div>
+    <div class="panel-actions"><button id="spectralBtn" title="DMD/Koopman spectrum (modes oscillants), power spectrum FFT, multiscale entropy ladder. Révèle structures périodiques + scaling.">compute spectral</button></div>
   </div>
 
   <!-- Causal -->
@@ -517,7 +517,7 @@
       <span style="color:var(--cyan);">●</span> latent dim &nbsp;&nbsp;
       <span style="color:var(--amber);">→</span> TE direction
     </div>
-    <div class="panel-actions"><button id="causalBtn">compute causal</button></div>
+    <div class="panel-actions"><button id="causalBtn" title="Granger + Transfer Entropy + CCM entre dimensions latentes. Visualise graphe causal entre composantes.">compute causal</button></div>
   </div>
 
   <!-- Topology -->
@@ -532,7 +532,7 @@
       <span class="k">H1 entropy</span><span class="v" id="t_eh1">—</span>
       <span class="k">sliding windows</span><span class="v" id="t_win">—</span>
     </div>
-    <div class="panel-actions"><button id="topoBtn">compute topology</button></div>
+    <div class="panel-actions"><button id="topoBtn" title="Persistent homology H0 (composantes connexes) + H1 (cycles fermés) via Vietoris-Rips. Sliding window pour évolution topologique.">compute topology</button></div>
   </div>
 
   <!-- SINDy + Emergence -->
@@ -554,7 +554,7 @@
       </div>
       <div id="emergenceLadder" style="margin-top:8px;"></div>
     </div>
-    <div class="panel-actions"><button id="sindyBtn">discover equations</button></div>
+    <div class="panel-actions"><button id="sindyBtn" title="SINDy : sparse regression sur library polynomiale → trouve équations différentielles dz/dt = f(z). Pour Lorenz, retrouve équations originales avec R²>0.99.">discover equations</button></div>
   </div>
 
   <!-- Frame inspector + kNN -->
@@ -581,7 +581,7 @@
         Cherche frames matching un prompt texte. Requires : video encodee avec <b style="color:var(--cyan);">clip_vit_b32</b>.
       </div>
       <input type="text" id="clipQuery" placeholder="e.g. 'a colorful fractal', 'fire flames'" style="width: 100%; background: #000; color: var(--fg); border: 1px solid var(--border-strong); padding: 7px 9px; font-family: var(--mono); font-size: 11px; border-radius: 2px; outline: none; margin-bottom: 6px;" />
-      <button id="clipBtn" style="color: var(--plasma); border-color: var(--plasma);">search frames</button>
+      <button id="clipBtn" style="color: var(--plasma); border-color: var(--plasma);" title="Cherche frames matching un prompt texte via CLIP. CLIP encode texte → cosine sim contre features visuelles. Top-k retournés.">search frames</button>
       <div id="clipResults" style="display:none; margin-top: 10px;">
         <div style="font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 0.14em; margin-bottom: 4px;">TOP MATCHES</div>
         <div id="clipGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px;"></div>
@@ -613,7 +613,7 @@
       <span class="val" id="segMinVal">4</span>
       <input type="range" class="param-slider" id="segMin" min="2" max="20" value="4" step="1" />
     </div>
-    <button id="segBtn" style="color: var(--amber); border-color: var(--amber);">detect boundaries</button>
+    <button id="segBtn" style="color: var(--amber); border-color: var(--amber);" title="Détecte transitions/cuts via peaks de vélocité perceptuelle. Méthodes : adaptive (median+MAD), std, percentile.">detect boundaries</button>
     <div id="segResult" style="margin-top: 12px; display: none;">
       <div class="mgrid" style="margin-bottom: 10px;">
         <span class="k">boundaries</span><span class="v" id="segNB">—</span>
@@ -646,7 +646,7 @@
         <option value="cosine">cosine</option>
       </select>
     </div>
-    <button id="clusterBtn" style="color: var(--plasma); border-color: var(--plasma);">discover clusters</button>
+    <button id="clusterBtn" style="color: var(--plasma); border-color: var(--plasma);" title="HDBSCAN auto-clustering : pas de k requis, identifie density-based clusters + outliers (label -1).">discover clusters</button>
 
     <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);">
       <div style="font-family: var(--mono); font-size: 9px; color: var(--amber); letter-spacing: 0.16em; margin-bottom: 6px;">CLIP AUTO-LABEL</div>
@@ -658,10 +658,10 @@ warm red colors
 cool blue colors
 green landscape
 empty void</textarea>
-      <button id="labelBtn" style="color: var(--amber); border-color: var(--amber); margin-top: 6px;">label clusters via CLIP</button>
+      <button id="labelBtn" style="color: var(--amber); border-color: var(--amber); margin-top: 6px;" title="Pour chaque cluster, compute centroid CLIP feature et compare contre vocab texte. Top match = label automatique.">label clusters via CLIP</button>
     </div>
 
-    <button id="transBtn" style="color: var(--cyan); border-color: var(--cyan); margin-top: 6px;">show transitions graph</button>
+    <button id="transBtn" style="color: var(--cyan); border-color: var(--cyan); margin-top: 6px;" title="Matrice de transitions Markov entre clusters. Nodes = clusters (taille ∝ temps), edges = transitions (épaisseur ∝ count). Révèle narrative.">show transitions graph</button>
     <canvas id="transCanvas" class="analysis-canvas" style="aspect-ratio: 1/1; display:none; margin-top:8px;"></canvas>
     <div id="transCaption" class="panel-caption" style="display:none;">cluster transitions · arrow thickness ∝ count</div>
     <div id="clusterResult" style="margin-top: 12px; display: none;">
@@ -691,13 +691,13 @@ empty void</textarea>
       <span class="val" id="hidVal">256</span>
       <input type="range" class="param-slider" id="hidden" min="32" max="512" value="256" step="32" />
     </div>
-    <button id="predictBtn" style="color: var(--magenta); border-color: var(--magenta);">train predictor</button>
+    <button id="predictBtn" style="color: var(--magenta); border-color: var(--magenta);" title="Train petit MLP résiduel z[t+1] = z[t] + f(z[t]) sur trajectoire. Compute surprise per-frame = prediction error. Lien free energy + JEPA + world models.">train predictor</button>
     <div class="slider-field" style="margin-top: 10px;">
       <label>rollout horizon</label>
       <span class="val" id="horVal">20</span>
       <input type="range" class="param-slider" id="horizon" min="5" max="60" value="20" step="1" />
     </div>
-    <button id="rolloutBtn" style="color: #ff66cc; border-color: #ff66cc;">rollout from current frame</button>
+    <button id="rolloutBtn" style="color: #ff66cc; border-color: #ff66cc;" title="MLP rollout itératif : prédire H steps depuis frame actuel. Ghost trajectoire 3D. Comparer avec réel → step error croissante = divergence Lyapunov.">rollout from current frame</button>
     <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);">
       <div style="font-family: var(--mono); font-size: 9px; color: var(--amber); letter-spacing: 0.16em; margin-bottom: 6px;">COUNTERFACTUAL · cone of futures</div>
       <div class="slider-field">
@@ -710,7 +710,7 @@ empty void</textarea>
         <span class="val" id="cfNoiseVal">0.05</span>
         <input type="range" class="param-slider" id="cfNoise" min="0" max="50" value="5" step="1" />
       </div>
-      <button id="cfBtn" style="color: var(--amber); border-color: var(--amber);">imagine futures</button>
+      <button id="cfBtn" style="color: var(--amber); border-color: var(--amber);" title="Cone of futures : N rollouts depuis latents perturbés (Gaussian noise). Divergence cone = chaos local. Lien active inference / imagination JEPA.">imagine futures</button>
     </div>
     <div id="predictResult" style="margin-top: 12px; display: none;">
       <div class="mgrid">
@@ -735,7 +735,7 @@ empty void</textarea>
     <div style="font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; margin-bottom: 10px;">
       Synthèse multi-dimensionnelle de toutes les analyses. Score 0-100 + classification + radar 7-axes.
     </div>
-    <button id="dnaBtn" style="color: var(--plasma); border-color: var(--plasma);">compute DNA</button>
+    <button id="dnaBtn" style="color: var(--plasma); border-color: var(--plasma);" title="Score composite 0-100 synthétisant 7 axes (chaos, topology, complexity, spectral, structure, causality, predictability). Classification automatique du régime.">compute DNA</button>
     <div id="dnaResult" style="display:none; margin-top: 14px;">
       <div style="text-align: center; padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
         <div id="dnaScore" style="font-family: var(--mono); font-size: 48px; color: var(--plasma); text-shadow: 0 0 20px var(--plasma); letter-spacing: 0.05em;">—</div>
@@ -765,7 +765,7 @@ empty void</textarea>
       <span class="val" id="evStrVal">8</span>
       <input type="range" class="param-slider" id="evStr" min="2" max="30" value="8" step="1" />
     </div>
-    <button id="evBtn" style="color: var(--cyan); border-color: var(--cyan);">compute evolution</button>
+    <button id="evBtn" style="color: var(--cyan); border-color: var(--cyan);" title="Sliding window metrics : velocity, local dim, n_clusters, predictability par fenêtre temporelle. Révèle non-stationnarité (où vidéo change de régime).">compute evolution</button>
     <div id="evResult" style="display:none; margin-top: 12px;">
       <div class="mgrid">
         <span class="k">n_windows</span><span class="v" id="evN">—</span>
@@ -809,8 +809,8 @@ empty void</textarea>
       pipeline · ingestion → encoder → UMAP 3D → analysis
     </div>
     <div class="panel-actions">
-      <button id="runAllBtn">run all analyses</button>
-      <button id="reportBtn" style="margin-top: 6px; color: var(--amber); border-color: var(--amber);">export HTML report</button>
+      <button id="runAllBtn" title="Pipeline complet : exécute dynamics + spectral + causal + topology + SINDy/emergence séquentiellement. Remplit tous les onglets d'analyse.">run all analyses</button>
+      <button id="reportBtn" style="margin-top: 6px; color: var(--amber); border-color: var(--amber);" title="Génère rapport HTML standalone avec tous les analytics + snapshots canvas embedded. Téléchargeable, partageable, archive recherche.">export HTML report</button>
     </div>
   </div>
 </div>
@@ -823,7 +823,7 @@ empty void</textarea>
   <div class="scrubber-wrap">
     <div class="scrubber-row">
       <span style="font-family: var(--mono); font-size: 9px; color: rgba(0,229,255,0.6); letter-spacing: 0.16em;">t=0</span>
-      <input type="range" class="scrubber" id="scrubber" min="0" max="100" value="100" />
+      <input type="range" class="scrubber" id="scrubber" min="0" max="100" value="100" title="Scrubber temporel. Position dans trajectoire. Synchronise marker 3D (sphère blanche pulse), player thumbnail, frame counter. Cliquer 3D point = jump auto." />
       <span style="font-family: var(--mono); font-size: 9px; color: rgba(255,45,212,0.7); letter-spacing: 0.16em;">t=N</span>
     </div>
     <div class="color-legend" id="colorLegend">

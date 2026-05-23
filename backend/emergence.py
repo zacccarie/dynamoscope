@@ -1,11 +1,26 @@
-"""Emergence quantifiable : effective information micro vs macro (Hoel-style).
-Mesure du gain de predictibilite quand on coarse-graine."""
+"""Émergence causale quantifiable (Hoel-Albantakis-Tononi 2013).
+
+Question : un système peut-il être plus déterministe à l'échelle macro qu'à la micro ?
+Si oui = causal emergence (Hoel) = macro-pattern a effective info supérieure.
+
+Méthode :
+1. Effective Information EI = MI(state[t], state[t+1]) (mutual info temporal)
+2. Coarse-grain states (group consecutive frames)
+3. Compute EI à différentes échelles
+4. φ_id ≈ gain EI(macro) - EI(micro)
+
+φ_id > 0 → émergence causale présente.
+"""
 from __future__ import annotations
 import numpy as np
 
 
 def _mutual_info_bins(x: np.ndarray, y: np.ndarray, bins: int = 16) -> float:
-    """MI(X; Y) via histogramme 2D."""
+    """Mutual Information I(X;Y) = Σ p(x,y) log[p(x,y) / (p(x)p(y))].
+
+    Mesure dépendance statistique X et Y (0 = indépendants, max = identiques).
+    Estimé via histogramme 2D : binning continu → discret puis formule classique.
+    """
     if len(x) != len(y) or len(x) < 4:
         return 0.0
     hist, _, _ = np.histogram2d(x, y, bins=bins)
@@ -18,7 +33,12 @@ def _mutual_info_bins(x: np.ndarray, y: np.ndarray, bins: int = 16) -> float:
 
 
 def transition_mi(X: np.ndarray, bins: int = 16) -> float:
-    """MI moyenne entre etat t et etat t+1, marginalisee sur dimensions."""
+    """Effective Information EI(t→t+1) moyennée sur dimensions du state.
+
+    EI mesure prédictibilité de l'état suivant depuis état actuel.
+    Élevé = système déterministe / structuré.
+    Bas = aléatoire / chaotique.
+    """
     n, d = X.shape
     if n < 8:
         return 0.0
@@ -29,7 +49,11 @@ def transition_mi(X: np.ndarray, bins: int = 16) -> float:
 
 
 def coarse_grain_states(X: np.ndarray, factor: int) -> np.ndarray:
-    """Macro-etats par pooling temporel."""
+    """Construit macro-états en groupant `factor` micro-états consécutifs.
+
+    Macro_state[i] = moyenne(micro_states[i·factor : (i+1)·factor]).
+    Diminue résolution temporelle, augmente potentiellement déterminisme.
+    """
     n, d = X.shape
     new_n = n // factor
     if new_n < 4:
@@ -41,7 +65,14 @@ def coarse_grain_states(X: np.ndarray, factor: int) -> np.ndarray:
 def effective_information_ladder(
     X: np.ndarray, scales: list[int] | None = None, bins: int = 14
 ) -> dict:
-    """EI a chaque echelle. Emergence si EI_macro > EI_micro (Hoel 2013)."""
+    """Compute EI(s) pour échelles s = [1, 2, 4, 8, 16, 32] via coarse-graining.
+
+    φ_id ≈ max(EI(s>1) - EI(1)) > 0 → émergence (macro plus déterministe).
+    Optimal_scale = échelle où EI maximum.
+
+    Pour Lorenz : φ_id ≈ 0 (système déjà déterministe au micro).
+    Pour systèmes stochastiques avec macro-patterns : φ_id > 0.
+    """
     if scales is None:
         scales = [1, 2, 4, 8, 16]
     ladder = []

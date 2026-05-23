@@ -1,11 +1,23 @@
-"""Analyse causale : Granger pairwise + Transfer Entropy + CCM Sugihara."""
+"""Analyse causale : qui influence qui dans les séries temporelles latentes ?
+
+3 méthodes complémentaires :
+- **Granger causality** (1969) : X cause Y si prédiction de Y améliore avec X dans modèle linéaire
+- **Transfer Entropy** (Schreiber 2000) : information transférée X→Y au-delà info Y intrinsèque
+- **CCM** (Sugihara 2012, Convergent Cross Mapping) : Y cause X si l'historique de X contient info sur Y
+  (subtil : direction CCM = X→Y signifie Y est cause, X est effet)
+
+Granger linéaire, TE info-théorique, CCM topologique. Triangulation pour robustesse.
+"""
 from __future__ import annotations
 import numpy as np
 from scipy.spatial import cKDTree
 
 
 def _lag_matrix(x: np.ndarray, lag: int) -> np.ndarray:
-    """Construit matrice de lags [x_{t-lag}, ..., x_{t-1}]."""
+    """Construit matrice (N-lag, lag) où chaque ligne = lag valeurs passées.
+
+    Utilisé pour régression Granger : modèle Y_t = β·[Y_{t-lag},...,Y_{t-1}].
+    """
     n = len(x)
     if lag <= 0 or lag >= n:
         return np.zeros((0, lag))
@@ -16,8 +28,23 @@ def _lag_matrix(x: np.ndarray, lag: int) -> np.ndarray:
 
 
 def granger_pairwise(series: np.ndarray, lag: int = 3) -> np.ndarray:
-    """Granger causality test pairwise (D x D matrix).
-    series: (N, D). Retourne F-stat-like score j -> i ; > 0 = j cause i."""
+    """Test Granger pairwise : pour chaque paire (i, j), j cause-t-il i ?
+
+    Méthode : compare 2 régressions :
+      restreint : Y_i = f(Y_i passé)
+      full      : Y_i = f(Y_i passé, Y_j passé)
+    Si full bat restreint significativement → j cause Granger i.
+
+    Score = (RSS_restreint - RSS_full) / RSS_full = amélioration relative.
+    Score > 0 = j → i (j est cause Granger de i au lag donné).
+
+    Args:
+        series: (N, D) multivariate time series
+        lag: nombre de pas passés inclus dans modèle
+
+    Returns:
+        (D, D) matrix où entry [j,i] = causalité de j vers i
+    """
     n, d = series.shape
     if n <= lag + 2:
         return np.zeros((d, d))
@@ -50,7 +77,17 @@ def granger_pairwise(series: np.ndarray, lag: int = 3) -> np.ndarray:
 
 
 def transfer_entropy_binned(x: np.ndarray, y: np.ndarray, lag: int = 1, bins: int = 6) -> float:
-    """TE(y -> x) estime via binning : I(x_t ; y_{t-lag} | x_{t-lag})."""
+    """Transfer Entropy y → x via histogramme conditionnel (Schreiber 2000).
+
+    Formule : TE_{y→x} = I(x_t ; y_{t-lag} | x_{t-lag})
+                       = "information additionnelle apportée par y_passé pour prédire x_actuel
+                          au-delà de ce que x_passé prédit déjà"
+
+    Différence avec Mutual Information : TE est asymétrique (conditionne sur x_passé).
+    Plus robuste que Granger pour relations non-linéaires (mesure info-théorique).
+
+    Unité : bits (log base 2).
+    """
     n = len(x)
     if n <= lag + 4:
         return 0.0
@@ -94,7 +131,7 @@ def transfer_entropy_binned(x: np.ndarray, y: np.ndarray, lag: int = 1, bins: in
 
 
 def transfer_entropy_matrix(series: np.ndarray, lag: int = 1, bins: int = 6) -> np.ndarray:
-    """TE matrix j -> i sur D variables."""
+    """Matrice TE complète (D, D) : pour chaque paire (j, i), TE_{j→i}."""
     n, d = series.shape
     out = np.zeros((d, d), dtype=np.float64)
     for i in range(d):
@@ -106,8 +143,22 @@ def transfer_entropy_matrix(series: np.ndarray, lag: int = 1, bins: int = 6) -> 
 
 
 def ccm_sugihara(x: np.ndarray, y: np.ndarray, e: int = 3, tau: int = 1, lib_size: int | None = None) -> float:
-    """Convergent Cross Mapping (Sugihara 2012) : skill = corr(y_true, y_pred from x manifold).
-    Forte CCM x -> y signifie x contient info sur y (y cause x dans systemes dynamiques)."""
+    """Convergent Cross Mapping (Sugihara et al. 2012).
+
+    Théorème généralisé de Takens : si Y cause X dans système dynamique unifié,
+    alors l'historique de X contient des traces de Y. CCM teste cette implication.
+
+    Algorithme :
+    1. Construit shadow manifold M_X via Takens embedding de x
+    2. Pour chaque point de M_X, trouve e+1 nearest neighbors temporels
+    3. Prédit y(t) comme moyenne pondérée des y aux temps voisins
+    4. Skill = corrélation(y_vrai, y_prédit)
+
+    Interpretation : CCM(x → y) élevé signifie Y est cause de X.
+    (Direction sémantique inversée vs Granger ! Sugihara teste implication causale via topologie.)
+
+    Utile pour systèmes déterministes non-linéaires (chaos, écosystèmes).
+    """
     n = len(x)
     span = (e - 1) * tau
     if n <= span + 5:
@@ -157,8 +208,16 @@ def ccm_sugihara(x: np.ndarray, y: np.ndarray, e: int = 3, tau: int = 1, lib_siz
 
 
 def causal_summary(series: np.ndarray, lag: int = 2, te_bins: int = 5) -> dict:
-    """Pipeline causal complet sur trajectoire (N, D).
-    Sub-sample dimensions si D > 6 par PCA-light (variance top)."""
+    """Pipeline causal complet : Granger + Transfer Entropy + CCM en un appel.
+
+    Si D > 6 dimensions, garde 6 dims avec variance max (PCA-light implicite).
+    Retourne 3 matrices D×D + labels pour visualisation graphe causal.
+
+    Permet trianguler causalité :
+    - Edge fort en Granger + TE + CCM = causalité robuste
+    - Edge en TE seul = relation non-linéaire (Granger rate, CCM rate aussi car non-déterministe)
+    - Edge en CCM seul = couplage chaotique déterministe
+    """
     n, d = series.shape
     series = series.astype(np.float64)
     # Reduire si trop de dimensions (graphe lisible)

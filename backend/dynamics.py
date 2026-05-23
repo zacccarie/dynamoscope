@@ -1,11 +1,31 @@
-"""Analyse dynamique : Lyapunov, recurrence plot, RQA, Takens embedding."""
+"""Analyse dynamique : vidéo = trajectoire dans espace d'états.
+
+Métriques classiques systèmes dynamiques :
+- Lyapunov exponent : taux divergence trajectoires proches (chaos quantifié)
+- Recurrence plot : visualise retours dans même région phase space
+- RQA (Recurrence Quantification Analysis) : stats structure récurrente
+- Correlation dimension : effective dim via Grassberger-Procaccia
+- Takens embedding : reconstruction phase space depuis observable scalaire
+"""
 from __future__ import annotations
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 
 
 def mutual_info_lag(series: np.ndarray, max_lag: int = 50, bins: int = 16) -> int:
-    """Premier minimum de mutual info -> lag optimal Takens. Heuristique simple via histogramme."""
+    """Trouve lag τ optimal pour Takens embedding via premier minimum mutual info.
+
+    Théorie : MI(x(t), x(t+τ)) mesure dépendance temporelle.
+    Premier minimum local de MI(τ) = lag où x(t+τ) "moins corrélé" à x(t) → bon pour embedding.
+
+    Args:
+        series: signal scalaire 1D
+        max_lag: lag maximum exploré
+        bins: histogram bins pour estimation MI
+
+    Returns:
+        Lag τ optimal (int).
+    """
     n = len(series)
     mi = np.zeros(max_lag + 1)
     series = (series - series.min()) / max(series.ptp(), 1e-9)
@@ -22,7 +42,7 @@ def mutual_info_lag(series: np.ndarray, max_lag: int = 50, bins: int = 16) -> in
         px_grid = px[:, None] * py[None, :]
         with np.errstate(divide="ignore", invalid="ignore"):
             mi[lag] = np.sum(pxy[nonzero] * np.log(pxy[nonzero] / np.maximum(px_grid[nonzero], 1e-12)))
-    # premier minimum local
+    # Premier minimum local de MI = lag optimal Takens
     for lag in range(2, max_lag):
         if mi[lag] < mi[lag - 1] and mi[lag] < mi[lag + 1]:
             return lag
@@ -30,7 +50,21 @@ def mutual_info_lag(series: np.ndarray, max_lag: int = 50, bins: int = 16) -> in
 
 
 def takens_embed(series: np.ndarray, m: int = 3, tau: int = 1) -> np.ndarray:
-    """Reconstruction phase space par delay coordinates. (N, m)."""
+    """Reconstruction phase space par delay coordinates (Takens 1981).
+
+    Théorème Takens : pour système dynamique générique, l'embedding
+    (x(t), x(t+τ), ..., x(t+(m-1)τ)) avec m ≥ 2d+1 (d = dim attracteur)
+    est diffeomorphe à la dynamique originale. Permet reconstruire l'attracteur
+    depuis UNE seule observable scalaire.
+
+    Args:
+        series: signal 1D (e.g., 1 dimension du latent)
+        m: dimension embedding
+        tau: delay (typiquement 1er minimum MI)
+
+    Returns:
+        Trajectoire embedded (N - (m-1)τ, m).
+    """
     n = len(series)
     span = (m - 1) * tau
     if span >= n:
@@ -42,7 +76,22 @@ def takens_embed(series: np.ndarray, m: int = 3, tau: int = 1) -> np.ndarray:
 
 
 def recurrence_matrix(traj: np.ndarray, eps: float | None = None, max_n: int = 400) -> tuple[np.ndarray, float]:
-    """Recurrence plot binaire. Down-sample si trop long. Retourne (R, eps)."""
+    """Matrice de récurrence binaire : R[i,j] = 1 si ‖traj[i] - traj[j]‖ < eps.
+
+    Inventée Eckmann-Kamphorst-Ruelle 1987. Visualise structure temporelle :
+    - Diagonale = trivialement R[i,i]=1
+    - Lignes diagonales parallèles = orbites quasi-périodiques (système revisite même état)
+    - Blocs = phases longues quasi-stationnaires
+    - Patterns aléatoires = stochastique
+
+    Args:
+        traj: (N, d) trajectoire
+        eps: seuil distance (None = 10ème percentile auto)
+        max_n: subsample si N > max_n (matrices N² explosent vite)
+
+    Returns:
+        (R binaire (n,n), eps utilisé)
+    """
     n = traj.shape[0]
     if n > max_n:
         idx = np.linspace(0, n - 1, max_n).astype(int)
@@ -50,7 +99,7 @@ def recurrence_matrix(traj: np.ndarray, eps: float | None = None, max_n: int = 4
         n = max_n
     dists = squareform(pdist(traj, metric="euclidean"))
     if eps is None:
-        # 10e percentile des distances non-diagonales = seuil
+        # 10e percentile = ~10% paires sont "récurrentes" en moyenne
         mask = ~np.eye(n, dtype=bool)
         eps = float(np.percentile(dists[mask], 10))
     R = (dists <= eps).astype(np.uint8)
@@ -58,23 +107,32 @@ def recurrence_matrix(traj: np.ndarray, eps: float | None = None, max_n: int = 4
 
 
 def rqa_stats(R: np.ndarray, lmin: int = 2) -> dict:
-    """RQA basique : RR, DET, LAM."""
+    """RQA = Recurrence Quantification Analysis (Marwan et al.).
+
+    3 métriques principales :
+    - **RR** (Recurrence Rate) : densité globale points récurrents
+    - **DET** (Determinism) : fraction points sur diagonales lmin+ → prédictibilité système
+    - **LAM** (Laminarity) : fraction points sur verticales lmin+ → phases quasi-stationnaires
+
+    DET élevé = trajectoire prédictible (revient sur même chemin).
+    LAM élevé = système "freeze" temporairement dans régimes stables.
+    """
     n = R.shape[0]
     rr = float(R.sum() / (n * n))
 
-    # Determinism : fraction des points sur diagonales >= lmin
+    # Determinism : compte points sur diagonales de longueur ≥ lmin
     diag_points = 0
     det_points = 0
     for k in range(-(n - 1), n):
         if k == 0:
-            continue
+            continue  # skip diagonale principale (trivialement 1)
         d = np.diag(R, k=k)
         runs = _run_lengths(d)
         diag_points += int(d.sum())
         det_points += int(sum(r for r in runs if r >= lmin))
     det = det_points / max(diag_points, 1)
 
-    # Laminarity : fraction des points sur verticales >= lmin
+    # Laminarity : compte points sur verticales
     lam_points = 0
     vert_points = 0
     for col in range(n):
@@ -88,6 +146,10 @@ def rqa_stats(R: np.ndarray, lmin: int = 2) -> dict:
 
 
 def _run_lengths(binary: np.ndarray) -> list[int]:
+    """Helper : longueurs des runs consécutifs de 1 dans vecteur binaire.
+
+    Ex : [0,1,1,1,0,1,1,0] → [3, 2]. Utilisé par DET/LAM.
+    """
     runs: list[int] = []
     count = 0
     for v in binary:
@@ -107,23 +169,38 @@ def lyapunov_rosenstein(
     k_neighbors: int = 1,
     max_steps: int | None = None,
 ) -> tuple[float, np.ndarray]:
-    """Rosenstein 1993 : largest Lyapunov exponent depuis trajectoire embeded.
-    Retourne (lambda_estim, divergence_curve)."""
+    """Plus grand exposant de Lyapunov via Rosenstein et al. 1993.
+
+    Théorie : si λ > 0, deux trajectoires initialement proches divergent
+    exponentiellement comme `d(t) ≈ d(0) · exp(λt)`. λ quantifie chaos.
+
+    Algorithme :
+    1. Pour chaque point i, trouve nearest neighbor j (exclus voisins temporels proches)
+    2. Trace divergence ‖traj[i+k] - traj[j+k]‖ pour k=0..max_steps
+    3. Fit linéaire sur log(divergence moyenne) vs k → pente = λ
+
+    Args:
+        traj: trajectoire (N, d)
+        mean_period: exclut voisins temporels |i-j| < mean_period
+        k_neighbors: nombre voisins par point (1 = rapide, plus = stable)
+        max_steps: horizon temporel pour fit
+
+    Returns:
+        (λ_estim, courbe_divergence)
+    """
     n = traj.shape[0]
     if max_steps is None:
         max_steps = min(40, n // 4)
 
-    # Pour chaque point i, trouve nearest neighbor j avec |i-j| > mean_period
     dists = squareform(pdist(traj, metric="euclidean"))
     np.fill_diagonal(dists, np.inf)
-    # exclure voisins temporels proches
+    # Exclut voisins temporels proches (Theiler window) — évite fausse récurrence
     for i in range(n):
         lo = max(0, i - mean_period)
         hi = min(n, i + mean_period + 1)
         dists[i, lo:hi] = np.inf
 
     neighbors = np.argmin(dists, axis=1)
-    # validité : i et neighbor doivent avoir au moins max_steps de marge
     valid = (np.arange(n) + max_steps < n) & (neighbors + max_steps < n)
     idx = np.where(valid)[0]
     if len(idx) < 10:
@@ -140,7 +217,7 @@ def lyapunov_rosenstein(
             log_div[step] = np.mean(np.log(d))
             counts[step] = len(d)
 
-    # fit lineaire sur partie initiale (typ. 0..max_steps//2)
+    # Fit linéaire log-divergence sur partie initiale (avant saturation)
     fit_end = max(5, max_steps // 2)
     t = np.arange(fit_end)
     slope = np.polyfit(t, log_div[:fit_end], 1)[0]
@@ -148,7 +225,14 @@ def lyapunov_rosenstein(
 
 
 def correlation_dimension(traj: np.ndarray, n_eps: int = 14) -> float:
-    """Estimation rapide dim de correlation (Grassberger-Procaccia)."""
+    """Dimension de corrélation (Grassberger-Procaccia 1983).
+
+    Théorie : compte paires de points à distance < eps. Pour fractale,
+    C(eps) ∝ eps^d où d = dim fractale (cap. = capacity dim ≤ box-counting).
+
+    Pour Lorenz, théorie prédit d ≈ 2.06 (attracteur quasi-2D dans 3D).
+    Calculé via régression log-log de C(eps) vs eps.
+    """
     n = traj.shape[0]
     if n > 800:
         idx = np.linspace(0, n - 1, 800).astype(int)
@@ -172,7 +256,16 @@ def correlation_dimension(traj: np.ndarray, n_eps: int = 14) -> float:
 
 
 def analyse_trajectory(coords: np.ndarray, max_n: int = 600) -> dict:
-    """Pipeline complet : embed-ready coords (N, d) -> stats dynamiques."""
+    """Pipeline complet analyse dynamique : Lyapunov + RQA + corr.dim + recurrence.
+
+    Args:
+        coords: trajectoire (N, d) — typiquement coords 3D UMAP
+        max_n: subsample si N > max_n pour limiter coût matriciel
+
+    Returns:
+        Dict avec lyapunov, correlation_dim, epsilon, rqa {RR/DET/LAM},
+        divergence_curve, recurrence matrix binary.
+    """
     n = coords.shape[0]
     if n > max_n:
         idx = np.linspace(0, n - 1, max_n).astype(int)

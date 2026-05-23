@@ -1,4 +1,14 @@
-"""Sliding window analytics : metrics evolution over time."""
+"""Sliding window analytics : évolution temporelle des métriques.
+
+Au lieu d'agréger sur toute la vidéo, calcule métriques par fenêtre glissante.
+Révèle non-stationnarité : où vidéo change-t-elle de régime ?
+
+Métriques per-window :
+- velocity : taux de changement
+- local_dim : effective rank PCA local (complexité instantanée)
+- n_clusters : modes locaux
+- predictability : déterminisme local
+"""
 from __future__ import annotations
 import math
 import numpy as np
@@ -7,7 +17,10 @@ from sklearn.preprocessing import normalize
 
 
 def _windowed_velocity(latents: np.ndarray) -> float:
-    """Mean cosine distance frame-a-frame."""
+    """Vitesse moyenne dans window : mean(1 - cos(z[t], z[t-1])).
+
+    Cosine distance robuste à magnitude, sensible direction features.
+    """
     n = latents.shape[0]
     if n < 2:
         return 0.0
@@ -19,7 +32,14 @@ def _windowed_velocity(latents: np.ndarray) -> float:
 
 
 def _windowed_local_dim(latents: np.ndarray) -> float:
-    """Estim. local PCA effective rank (entropy of normalized eigvals)."""
+    """Effective dimensionality via entropie des eigvalues PCA locales.
+
+    PCA(window) → eigvalues λ_i. Compute p_i = λ_i / Σλ.
+    Effective dim = exp(-Σ p_i log p_i) = entropie exponentielle.
+
+    Si window vit dans sous-espace 1D, eff_dim ≈ 1. Si full rank, ≈ window size.
+    Mesure complexité locale du signal.
+    """
     n = latents.shape[0]
     if n < 4:
         return 0.0
@@ -35,7 +55,11 @@ def _windowed_local_dim(latents: np.ndarray) -> float:
 
 
 def _windowed_n_clusters(latents: np.ndarray) -> int:
-    """HDBSCAN min_cluster_size=3 sur window."""
+    """Compte modes locaux via mini-HDBSCAN (min_cluster_size=3).
+
+    Window avec 1 cluster = phase homogène.
+    Window avec multiple clusters = transition entre régimes.
+    """
     n = latents.shape[0]
     if n < 6:
         return 0
@@ -49,7 +73,11 @@ def _windowed_n_clusters(latents: np.ndarray) -> int:
 
 
 def _windowed_predictability(latents: np.ndarray) -> float:
-    """Predictability proxy = 1 - var(velocity) / mean(velocity) (signal-to-noise)."""
+    """Proxy prédictibilité : ratio signal/bruit des vélocités.
+
+    1 - std(vel)/mean(vel) : si vitesse régulière (low std) → prédictible.
+    Si vitesse erratique (high std) → chaotique/imprévisible.
+    """
     n = latents.shape[0]
     if n < 4:
         return 0.0
@@ -65,7 +93,11 @@ def evolution_pipeline(
     window: int = 24,
     stride: int = 8,
 ) -> dict:
-    """Calcule metrics par window. Retourne séries temporelles alignées."""
+    """Glisse fenêtre window avec stride, calcule 4 métriques par window.
+
+    Returns centers (frame index milieu de chaque window) + métriques aligned.
+    Frontend trace 4 courbes superposées révélant évolution temporelle.
+    """
     n = latents.shape[0]
     if n < window + stride:
         # Pas assez : compute on full

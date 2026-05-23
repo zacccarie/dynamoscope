@@ -1,4 +1,12 @@
-"""Reduction dimensionnelle : UMAP / PCA / Isomap 3D."""
+"""Réduction dimensionnelle : latents haute-dim (768-2048d) → 3D pour visualisation.
+
+3 algorithmes au choix :
+- UMAP : non-linéaire topologique, préserve voisinages, distord distances globales
+- PCA : linéaire orthogonale, préserve variance + distances euclidiennes
+- Isomap : géodésique k-NN, préserve distances sur manifold
+
+Plus : trajectoire Lorenz synthétique pour démos.
+"""
 from __future__ import annotations
 import numpy as np
 import umap
@@ -14,20 +22,33 @@ def reduce_3d(
     metric: str = "cosine",
     smoothing: int = 0,
 ) -> np.ndarray:
-    """(N, D) -> (N, 3) float32, normalise dans [-1, 1].
-    methods : umap, pca, isomap.
-    n_neighbors : taille voisinage local (UMAP/Isomap).
-    min_dist : compacité cluster (UMAP).
-    metric : cosine / euclidean / manhattan / correlation (UMAP).
-    smoothing : fenetre moyenne glissante post-projection (0 = off)."""
+    """Projette latents (N, D) → coords 3D (N, 3) ∈ [-1, 1]³.
+
+    Choix méthode :
+    - umap : non-linéaire, clusters séparés visuellement, mais distances déformées
+    - pca : linéaire, isométrique, frames proches en D restent proches en 3D
+    - isomap : compromis géodésique, bon sur manifolds courbés
+
+    Args:
+        latents: (N, D) features
+        method: 'umap' | 'pca' | 'isomap'
+        n_neighbors: échelle structure locale (UMAP/Isomap). Petit = détail, grand = global.
+        min_dist: compacité cluster UMAP. 0 = clusters serrés, 1 = uniforme.
+        metric: 'cosine' | 'euclidean' | 'manhattan' | 'correlation' (UMAP).
+        smoothing: moyenne glissante temporelle post-projection (lisse jumps UMAP).
+
+    Returns:
+        (N, 3) float32 normalisé [-1, 1] par axe (esthétique Three.js cube).
+    """
     n = latents.shape[0]
     d_target = min(3, n, latents.shape[1])
 
     if method == "umap" and n >= 5:
+        # n_neighbors auto-clip si n trop petit
         nn = min(max(2, n_neighbors), max(2, n - 1))
         reducer = umap.UMAP(
             n_components=3, n_neighbors=nn, min_dist=min_dist,
-            metric=metric, random_state=42,
+            metric=metric, random_state=42,  # reproductibilité
         )
         coords = reducer.fit_transform(latents)
     elif method == "isomap" and n >= 10:
@@ -35,15 +56,17 @@ def reduce_3d(
         reducer = Isomap(n_components=3, n_neighbors=nn)
         coords = reducer.fit_transform(latents)
     else:
-        # PCA = linéaire orthogonale, préserve distances proportionnellement
+        # PCA : linéaire, garantit distances proportionnelles
         pca = PCA(n_components=d_target)
         coords = pca.fit_transform(latents)
         if coords.shape[1] < 3:
+            # Pad zéros si data 1D ou 2D
             pad = np.zeros((n, 3 - coords.shape[1]))
             coords = np.concatenate([coords, pad], axis=1)
 
     coords = coords.astype(np.float32)
-    # Smoothing temporel post-projection (moyenne glissante centrée)
+
+    # Smoothing optionnel : moyenne glissante centrée pour lisser jumps UMAP artefactuels
     if smoothing > 1 and coords.shape[0] > smoothing:
         k = int(smoothing)
         pad = k // 2
@@ -51,10 +74,12 @@ def reduce_3d(
         smoothed = np.zeros_like(coords)
         for j in range(coords.shape[1]):
             smoothed[:, j] = np.convolve(coords[:, j], kernel, mode="same")
-        # Conserver bords non-lisses pour eviter regression aux extremes
+        # Conserve bords non-lissés pour éviter régression aux extrêmes
         smoothed[:pad] = coords[:pad]
         smoothed[-pad:] = coords[-pad:]
         coords = smoothed
+
+    # Min-max normalisation par axe → cube [-1, 1]³ (esthétique scene Three.js)
     mins = coords.min(axis=0)
     maxs = coords.max(axis=0)
     span = np.maximum(maxs - mins, 1e-6)
@@ -70,8 +95,25 @@ def lorenz_trajectory(
     beta: float = 8.0 / 3.0,
     return_raw: bool = False,
 ) -> np.ndarray:
-    """Genere trajectoire Lorenz pour demo. (N, 3) normalise [-1, 1].
-    Si return_raw=True, retourne (normalised, raw, dt)."""
+    """Intègre système Lorenz (1963) : équations chaos déterministe canonique.
+
+    Équations :
+        dx/dt = σ(y - x)
+        dy/dt = x(ρ - z) - y
+        dz/dt = xy - βz
+
+    Pour σ=10, ρ=28, β=8/3 → attracteur en papillon, exposant Lyapunov ≈ 0.906.
+    Méthode : Euler explicite, dt=0.01 (suffisant pour ce régime).
+
+    Args:
+        n: nombre de steps temporels
+        dt: pas d'intégration
+        sigma, rho, beta: paramètres Lorenz canoniques
+        return_raw: si True, retourne aussi coords brutes (utile SINDy avec vraies équations)
+
+    Returns:
+        coords normalisées (N, 3) ou (norm, raw, dt) si return_raw
+    """
     x, y, z = 0.1, 0.0, 0.0
     raw = np.zeros((n, 3), dtype=np.float32)
     for i in range(n):

@@ -1,10 +1,20 @@
-"""Zoo de systemes dynamiques canoniques pour benchmark + demo.
-Chaque generateur retourne (norm_coords [-1,1], raw_coords, dt, var_names, meta)."""
+"""Zoo de 6 systèmes dynamiques canoniques pour démos & benchmark.
+
+Chaque système = générateur déterministe avec params connus.
+Permet valider pipeline avec ground truth (SINDy doit retrouver équations originales).
+
+Catégories :
+- ODE chaotiques 3D : Lorenz, Rössler
+- Limit cycles : Van der Pol (2D embed Takens en 3D)
+- Maps discrètes : Hénon (2D), Logistic (1D)
+- Hamiltonian : Double pendulum (4D phase space, projection 3D)
+"""
 from __future__ import annotations
 import numpy as np
 
 
 def _normalise(raw: np.ndarray) -> np.ndarray:
+    """Min-max normalisation par axe → cube [-1, 1]³ pour visualisation Three.js."""
     mins = raw.min(axis=0)
     maxs = raw.max(axis=0)
     span = np.maximum(maxs - mins, 1e-6)
@@ -13,6 +23,11 @@ def _normalise(raw: np.ndarray) -> np.ndarray:
 
 def lorenz(n: int = 2500, dt: float = 0.01,
            sigma: float = 10.0, rho: float = 28.0, beta: float = 8.0 / 3.0) -> dict:
+    """Lorenz (1963) : chaos déterministe canonique. Atteur en papillon.
+
+    Équations : dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz
+    Pour σ=10, ρ=28, β=8/3 : Lyapunov ≈ 0.906, corr_dim ≈ 2.06.
+    """
     x, y, z = 0.1, 0.0, 0.0
     raw = np.zeros((n, 3), dtype=np.float32)
     for i in range(n):
@@ -32,6 +47,11 @@ def lorenz(n: int = 2500, dt: float = 0.01,
 
 def rossler(n: int = 2500, dt: float = 0.05,
             a: float = 0.2, b: float = 0.2, c: float = 5.7) -> dict:
+    """Rössler (1976) : chaos avec single funnel attractor.
+
+    Équations : dx/dt = -y-z, dy/dt = x+ay, dz/dt = b + z(x-c)
+    Plus simple que Lorenz (1 seul scroll vs 2 ailes). Lyapunov ≈ 0.07.
+    """
     x, y, z = 1.0, 1.0, 1.0
     raw = np.zeros((n, 3), dtype=np.float32)
     for i in range(n):
@@ -50,7 +70,12 @@ def rossler(n: int = 2500, dt: float = 0.05,
 
 
 def van_der_pol(n: int = 2500, dt: float = 0.05, mu: float = 2.0) -> dict:
-    """Oscillateur limit-cycle. 2D embed via Takens delay pour visu 3D."""
+    """Van der Pol (1920) : oscillateur non-linéaire avec limit cycle stable.
+
+    Équations : dx/dt = y, dy/dt = μ(1-x²)y - x
+    Pour μ ≈ 2 : relaxation oscillator avec asymétrie phase.
+    2D phase space embeddé en 3D via Takens delay coord.
+    """
     x, y = 0.5, 0.0
     raw = np.zeros((n, 2), dtype=np.float32)
     for i in range(n):
@@ -76,7 +101,11 @@ def van_der_pol(n: int = 2500, dt: float = 0.05, mu: float = 2.0) -> dict:
 
 
 def henon(n: int = 4000, a: float = 1.4, b: float = 0.3) -> dict:
-    """Map discrete chaotique 2D + Takens 3D."""
+    """Hénon (1976) : map discrète 2D, attracteur étrange fractal.
+
+    Récurrence : x_{n+1} = 1 - a·x_n² + y_n, y_{n+1} = b·x_n
+    Pour (a,b)=(1.4, 0.3) : strange attractor fractal Hausdorff dim ≈ 1.26.
+    """
     x, y = 0.0, 0.0
     raw = np.zeros((n, 2), dtype=np.float32)
     for i in range(n):
@@ -99,7 +128,12 @@ def henon(n: int = 4000, a: float = 1.4, b: float = 0.3) -> dict:
 
 
 def logistic_map(n: int = 4000, r: float = 3.9, embed_dim: int = 3, tau: int = 1) -> dict:
-    """Map 1D, sortie embedded en 3D pour visualiser bifurcation."""
+    """Map logistique : x_{n+1} = r·x_n·(1-x_n). Système 1D chaotique pour r > 3.57.
+
+    Période-doubling cascade vers chaos via bifurcations Feigenbaum.
+    Pour r=3.9 : chaos plein, attracteur fractal.
+    Embeddé en 3D via Takens delay coords pour visualisation.
+    """
     x = 0.4
     series = np.zeros(n, dtype=np.float32)
     for i in range(n):
@@ -123,7 +157,12 @@ def double_pendulum(n: int = 3000, dt: float = 0.02,
                     l1: float = 1.0, l2: float = 1.0,
                     m1: float = 1.0, m2: float = 1.0, g: float = 9.81,
                     th1_0: float = np.pi * 0.8, th2_0: float = np.pi * 0.6) -> dict:
-    """RK4 sur double pendule. Sortie : (theta1, theta2, omega1) en 3D."""
+    """Double pendule : Hamiltonian chaos, exemple canonique sensibilité initiale.
+
+    4D phase space (θ₁, θ₂, ω₁, ω₂), équations Lagrange non-linéaires.
+    Intégrateur RK4 4ème ordre pour stabilité numérique.
+    Sortie 3 dims (θ₁, θ₂, ω₁) pour visualisation 3D.
+    """
     th1, th2, w1, w2 = th1_0, th2_0, 0.0, 0.0
 
     def deriv(th1, th2, w1, w2):
@@ -170,7 +209,7 @@ SYSTEMS = {
 
 
 def list_systems() -> list[dict]:
-    """Metadata pour UI picker (instancie chacun en mini-batch pour recuperer le 'type')."""
+    """Liste statique des systèmes disponibles pour dropdown UI (id, name, type)."""
     return [
         {"id": "lorenz", "name": "Lorenz", "type": "chaotic 3D ODE"},
         {"id": "rossler", "name": "Rössler", "type": "chaotic 3D ODE · funnel"},

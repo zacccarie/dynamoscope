@@ -1,5 +1,9 @@
-"""Live capture sessions : streaming temps réel webcam.
-Maintient state per-session : latents accumulés, frame_paths, last reducer."""
+"""Live webcam sessions : streaming temps réel pour growing trajectory.
+
+Architecture session-based : chaque connexion webcam = 1 session avec UUID.
+Buffer FIFO 300 frames max. Encode chaque frame entrant, append latent.
+Re-project trajectory entière à chaque update (UMAP rapide sur petits N).
+"""
 from __future__ import annotations
 import time
 import uuid
@@ -9,7 +13,16 @@ import numpy as np
 
 
 class LiveSession:
-    """Session de capture en cours : accumule latents + frames + projette."""
+    """État d'une session webcam en cours.
+
+    Attributs :
+    - id : UUID 12 chars
+    - encoder_name : encoder utilisé pour cette session (verrouillé)
+    - latents : list growing de feature vectors
+    - thumb_paths : noms JPGs sauvés disque
+    - frames_dir : dossier dédié `cache/frames/live_{id}/`
+    - max_frames : FIFO buffer size (drop oldest si dépassé)
+    """
 
     def __init__(self, encoder_name: str, frames_dir: Path, max_frames: int = 300):
         self.id = uuid.uuid4().hex[:12]
@@ -42,14 +55,17 @@ _SESSIONS: dict[str, LiveSession] = {}
 
 
 def create_session(encoder_name: str, frames_dir: Path) -> LiveSession:
+    """Crée nouvelle session live + enregistre dans registry global _SESSIONS."""
     s = LiveSession(encoder_name=encoder_name, frames_dir=frames_dir)
     _SESSIONS[s.id] = s
     return s
 
 
 def get_session(sid: str) -> LiveSession | None:
+    """Retrieve session par UUID. Returns None si session expirée ou inexistante."""
     return _SESSIONS.get(sid)
 
 
 def end_session(sid: str) -> None:
+    """Cleanup session : retire du registry. Frames sur disque préservés pour history."""
     _SESSIONS.pop(sid, None)

@@ -1,12 +1,44 @@
-"""Analyse spectrale : DMD / Koopman operator sur trajectoire latente."""
+"""Analyse spectrale : DMD / Koopman operator sur trajectoire latente.
+
+DMD (Dynamic Mode Decomposition, Schmid 2010) = SVD-based eigendecomposition de
+l'opérateur linéaire qui mappe z[t] → z[t+1]. Trouve modes propres = orbites
+quasi-périodiques + leur taux de décroissance.
+
+Koopman operator (Koopman 1931) = opérateur linéaire infini-dim qui agit sur
+observables d'un système dynamique non-linéaire. DMD approxime ce spectre
+en dimension finie. Eigvals sur cercle unité = oscillations stables.
+
+Power spectrum FFT = analyse fréquentielle classique = composantes périodiques.
+"""
 from __future__ import annotations
 import numpy as np
 
 
 def dmd(latents: np.ndarray, rank: int | None = None, dt: float = 1.0) -> dict:
-    """Dynamic Mode Decomposition exact (Tu et al. 2014).
-    latents: (N, D) trajectoire temporelle.
-    Retourne eigenvalues complexes (Koopman spectrum) + amplitudes + frequences."""
+    """Exact DMD (Tu et al. 2014) — approxime Koopman opérateur.
+
+    Théorie : trouve matrice A telle que latents[t+1] ≈ A · latents[t].
+    Decompose A en eigenvalues complexes λ (modes) + amplitudes.
+    Eigvalue interpretation :
+      - |λ| ≈ 1 : mode stable oscillant
+      - |λ| < 1 : mode décroissant (transient)
+      - |λ| > 1 : mode croissant (instable)
+      - arg(λ) : fréquence angulaire du mode
+
+    Algorithme :
+    1. SVD tronquée de X = latents[:-1].T
+    2. Projection A_tilde = U* Y V S^-1 (espace réduit)
+    3. Eigendecomposition de A_tilde
+    4. Reconstruction modes Phi dans espace original
+
+    Args:
+        latents: (N, D) trajectoire temporelle
+        rank: troncature SVD (auto si None : 90% énergie cumulée)
+        dt: pas temporel pour calcul fréquences continues
+
+    Returns:
+        Dict avec eigvals_re/im, amplitudes, freqs, decay, singular_values.
+    """
     n, d = latents.shape
     if n < 4:
         raise ValueError("Need >= 4 timesteps for DMD")
@@ -57,7 +89,13 @@ def dmd(latents: np.ndarray, rank: int | None = None, dt: float = 1.0) -> dict:
 
 
 def power_spectrum(latents: np.ndarray, top_k: int = 64) -> dict:
-    """Spectre de puissance moyen sur dimensions latentes."""
+    """Power spectrum via FFT — composantes fréquentielles signal.
+
+    |FFT(z)|² = puissance par fréquence. Pour signal temporel :
+    - Pic dominant = fréquence principale (e.g., BPM si vidéo musique)
+    - Slope log-log = scaling : -2 (Brownian), -3 (chaos), -1 (1/f noise)
+    - Largeur pics = stabilité oscillations
+    """
     n, d = latents.shape
     # FFT par dimension, moyenne en magnitude
     fft = np.fft.rfft(latents - latents.mean(axis=0, keepdims=True), axis=0)

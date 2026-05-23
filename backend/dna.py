@@ -1,5 +1,17 @@
-"""Video DNA : composite complexity score depuis tous les analytics.
-Synthèse multi-dimensionnelle + classification + interprétation."""
+"""Video DNA : score composite synthétisant tous les analytics en une métrique.
+
+Construit "scorecard" 7-axes normalisée [0,1] :
+- chaos : Lyapunov exponent
+- topology : H1 cycles + persistence entropy
+- complexity : correlation dimension
+- spectral : exposant scaling
+- structure : cluster density
+- causality : transition mutual info
+- predictability : proxy signal-to-noise
+
+Composite = somme pondérée. Classification automatique selon thresholds combinés.
+Permet comparer 2 vidéos par un seul nombre.
+"""
 from __future__ import annotations
 import math
 import numpy as np
@@ -13,11 +25,24 @@ from .topology import persistent_homology
 
 
 def _clip01(x: float) -> float:
+    """Clip value dans [0, 1] pour normalisation scoring."""
     return max(0.0, min(1.0, float(x)))
 
 
 def compute_dna(latents: np.ndarray, coords_3d: np.ndarray) -> dict:
-    """Calcule scorecard 6D + composite + classification."""
+    """Pipeline DNA complet : 7 axes + composite + label classification.
+
+    Étapes :
+    1. Lyapunov + corr_dim depuis trajectoire 3D
+    2. Spectral slope depuis latents
+    3. PH H1 count + entropy
+    4. Velocity stats (predictability proxy)
+    5. HDBSCAN clusters (cluster_density)
+    6. Mutual info temporal (causality proxy)
+    7. Normalisation chaque axe → [0, 1] via clip
+    8. Composite = Σ weight × axis
+    9. Classification via règles thresholds combinés
+    """
     n = latents.shape[0]
 
     # 1. Dynamiques (Lyapunov + corr.dim sur coords_3d)
