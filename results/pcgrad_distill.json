@@ -1,0 +1,387 @@
+{
+  "summary": {
+    "baseline": {
+      "mean": 40.026,
+      "std": 3.4585118186873376,
+      "scores": [
+        38.35,
+        42.24,
+        42.89,
+        42.69,
+        33.96
+      ],
+      "n": 5
+    },
+    "phase_c": {
+      "mean": 47.839999999999996,
+      "std": 2.401432905579502,
+      "scores": [
+        47.6,
+        48.02,
+        51.7,
+        44.12,
+        47.76
+      ],
+      "n": 5
+    },
+    "phase_c_plus_distill_sum": {
+      "mean": 45.15,
+      "std": 1.6293802502792283,
+      "scores": [
+        45.08,
+        45.21,
+        44.96,
+        42.68,
+        47.82
+      ],
+      "n": 5
+    },
+    "phase_c_plus_distill_pcgrad": {
+      "mean": 43.794,
+      "std": 2.1188449683731,
+      "scores": [
+        46.65,
+        40.69,
+        43.11,
+        42.89,
+        45.63
+      ],
+      "n": 5
+    }
+  },
+  "tests": {
+    "phase_c_vs_baseline": {
+      "t": 3.711686414142146,
+      "p": 0.0002058829576534471
+    },
+    "phase_c_plus_distill_sum_vs_baseline": {
+      "t": 2.6805389113289326,
+      "p": 0.007350371826694513
+    },
+    "phase_c_plus_distill_pcgrad_vs_baseline": {
+      "t": 1.858006688086199,
+      "p": 0.06316806455347268
+    },
+    "phase_c_plus_distill_sum_vs_phase_c": {
+      "t": -1.853876695969952,
+      "p": 0.06375680262216044
+    },
+    "phase_c_plus_distill_pcgrad_vs_phase_c": {
+      "t": -2.526729424367723,
+      "p": 0.011513016397239895
+    }
+  },
+  "pcgrad_conflict_rate": 1.5555555555555554,
+  "raw": {
+    "baseline": [
+      {
+        "dna_score": 38.35,
+        "dna_axes": {
+          "chaos": 0.2596,
+          "topology": 0.3584,
+          "complexity": 0.5117,
+          "spectral": 0.4259,
+          "structure": 0.3664,
+          "causality": 0.0,
+          "predictability": 0.5134,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 42.24,
+        "dna_axes": {
+          "chaos": 0.2348,
+          "topology": 0.3892,
+          "complexity": 0.4793,
+          "spectral": 0.3874,
+          "structure": 1.0,
+          "causality": 0.0319,
+          "predictability": 0.5525,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 42.89,
+        "dna_axes": {
+          "chaos": 0.3984,
+          "topology": 0.4159,
+          "complexity": 0.498,
+          "spectral": 0.4539,
+          "structure": 0.2442,
+          "causality": 0.0824,
+          "predictability": 0.5684,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 42.69,
+        "dna_axes": {
+          "chaos": 0.0532,
+          "topology": 0.497,
+          "complexity": 0.5397,
+          "spectral": 0.42,
+          "structure": 0.6106,
+          "causality": 0.0265,
+          "predictability": 0.5889,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 33.96,
+        "dna_axes": {
+          "chaos": 0.1548,
+          "topology": 0.3584,
+          "complexity": 0.461,
+          "spectral": 0.3823,
+          "structure": 0.4885,
+          "causality": 0.0151,
+          "predictability": 0.5341,
+          "regime_confidence": 0.6492
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      }
+    ],
+    "phase_c": [
+      {
+        "dna_score": 47.6,
+        "dna_axes": {
+          "chaos": 0.6168,
+          "topology": 0.497,
+          "complexity": 0.4603,
+          "spectral": 0.4105,
+          "structure": 0.7327,
+          "causality": 0.0322,
+          "predictability": 0.5617,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 48.02,
+        "dna_axes": {
+          "chaos": 0.6256,
+          "topology": 0.4394,
+          "complexity": 0.503,
+          "spectral": 0.3663,
+          "structure": 0.7327,
+          "causality": 0.1228,
+          "predictability": 0.6412,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 51.7,
+        "dna_axes": {
+          "chaos": 0.5468,
+          "topology": 0.5666,
+          "complexity": 0.5987,
+          "spectral": 0.274,
+          "structure": 0.8548,
+          "causality": 0.1995,
+          "predictability": 0.627,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 44.12,
+        "dna_axes": {
+          "chaos": 0.412,
+          "topology": 0.4394,
+          "complexity": 0.5117,
+          "spectral": 0.3699,
+          "structure": 0.4885,
+          "causality": 0.0658,
+          "predictability": 0.659,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 47.76,
+        "dna_axes": {
+          "chaos": 0.7376,
+          "topology": 0.4159,
+          "complexity": 0.469,
+          "spectral": 0.4332,
+          "structure": 0.7327,
+          "causality": 0.0496,
+          "predictability": 0.6207,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      }
+    ],
+    "phase_c_plus_distill_sum": [
+      {
+        "dna_score": 45.08,
+        "dna_axes": {
+          "chaos": 0.8228,
+          "topology": 0.4394,
+          "complexity": 0.453,
+          "spectral": 0.3609,
+          "structure": 0.3664,
+          "causality": 0.0235,
+          "predictability": 0.5624,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 45.21,
+        "dna_axes": {
+          "chaos": 0.6428,
+          "topology": 0.4394,
+          "complexity": 0.484,
+          "spectral": 0.3374,
+          "structure": 0.2442,
+          "causality": 0.1213,
+          "predictability": 0.6497,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 44.96,
+        "dna_axes": {
+          "chaos": 0.4316,
+          "topology": 0.5781,
+          "complexity": 0.6223,
+          "spectral": 0.2454,
+          "structure": 0.3664,
+          "causality": 0.0,
+          "predictability": 0.6639,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 42.68,
+        "dna_axes": {
+          "chaos": 0.3148,
+          "topology": 0.4394,
+          "complexity": 0.5437,
+          "spectral": 0.3402,
+          "structure": 0.6106,
+          "causality": 0.008,
+          "predictability": 0.6753,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      },
+      {
+        "dna_score": 47.82,
+        "dna_axes": {
+          "chaos": 0.7976,
+          "topology": 0.4394,
+          "complexity": 0.4817,
+          "spectral": 0.4199,
+          "structure": 0.4885,
+          "causality": 0.0575,
+          "predictability": 0.6317,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 0,
+        "n_steps": 0
+      }
+    ],
+    "phase_c_plus_distill_pcgrad": [
+      {
+        "dna_score": 46.65,
+        "dna_axes": {
+          "chaos": 1.0,
+          "topology": 0.4394,
+          "complexity": 0.472,
+          "spectral": 0.3482,
+          "structure": 0.4885,
+          "causality": 0.0,
+          "predictability": 0.5485,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 68,
+        "n_steps": 45
+      },
+      {
+        "dna_score": 40.69,
+        "dna_axes": {
+          "chaos": 0.5716,
+          "topology": 0.497,
+          "complexity": 0.4733,
+          "spectral": 0.1862,
+          "structure": 0.2442,
+          "causality": 0.0045,
+          "predictability": 0.5561,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 68,
+        "n_steps": 45
+      },
+      {
+        "dna_score": 43.11,
+        "dna_axes": {
+          "chaos": 0.5048,
+          "topology": 0.513,
+          "complexity": 0.615,
+          "spectral": 0.2401,
+          "structure": 0.3664,
+          "causality": 0.1462,
+          "predictability": 0.6946,
+          "regime_confidence": 0.6468
+        },
+        "n_conflicts": 68,
+        "n_steps": 45
+      },
+      {
+        "dna_score": 42.89,
+        "dna_axes": {
+          "chaos": 0.2372,
+          "topology": 0.4796,
+          "complexity": 0.5483,
+          "spectral": 0.301,
+          "structure": 0.7327,
+          "causality": 0.0,
+          "predictability": 0.6709,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 72,
+        "n_steps": 45
+      },
+      {
+        "dna_score": 45.63,
+        "dna_axes": {
+          "chaos": 0.8524,
+          "topology": 0.4605,
+          "complexity": 0.4507,
+          "spectral": 0.3192,
+          "structure": 0.3664,
+          "causality": 0.0,
+          "predictability": 0.653,
+          "regime_confidence": 1.0
+        },
+        "n_conflicts": 74,
+        "n_steps": 45
+      }
+    ]
+  },
+  "n_seeds": 5,
+  "n_epochs": 15
+}

@@ -928,11 +928,26 @@ schemes push the latent toward incompatible geometries: Phase~C
 target-shapes statistical properties of $z$ (variance-normalized
 slowness, sparse Granger structure, target Lyapunov), while
 distillation \emph{copies} a fixed reference geometry. The combined
-gradient is a tug-of-war the optimizer cannot win on a small model.
-We expect the gap closes with larger models and longer training, or
-with explicit gradient-surgery techniques (PCGrad), but we do not
-claim this. We expose this negative result prominently as a
-direction for future weighting-schedule research.
+gradient is a tug-of-war.
+
+\paragraph{(iv) Gradient surgery does \emph{not} resolve it.}
+We tested PCGrad~\cite{yu2020pcgrad}, the canonical fix for multi-task
+gradient conflict, which orthogonally projects task-$i$ gradient onto
+the complement of task-$j$ gradient whenever
+$\langle g_i,g_j\rangle < 0$. With 1.55 projections per step (out of a
+maximum of 2), 78\% of training steps trigger projection, and the
+resulting DNA \emph{degrades} further: $43.79 \pm 2.12$ for
+$\texttt{phase\_c + distill\_pcgrad}$ vs.\ $45.15 \pm 1.63$ for the
+naive sum, and significantly worse than $\texttt{phase\_c}$ alone
+(Welch $t=-2.53$, $p=0.012$, $n=5$ each). After projection the model
+loses statistical significance over the baseline ($p=0.063$).
+The incompatibility is therefore \emph{representational}, not
+optimization-level : the two objectives demand mutually exclusive
+latent geometries, and removing the conflicting components removes
+substantive learning signal. This is a strong negative result that
+the released artifact (\verb|results/pcgrad_distill.json|) and the
+experiment driver (\verb|experiments/pcgrad_distill.py|) make
+fully reproducible.
 
 \subsection{Honest Limitations}
 
@@ -1145,6 +1160,12 @@ embeddings for representation and semi-supervised learning.
 \bibitem{mallat2012scattering}
 Mallat, S. (2012). Group invariant scattering. \emph{Communications
 on Pure and Applied Mathematics}, 65(10), 1331--1398.
+
+\bibitem{yu2020pcgrad}
+Yu, T., Kumar, S., Gupta, A., Levine, S., Hausman, K., \& Finn, C.
+(2020). Gradient surgery for multi-task learning.
+\emph{Advances in Neural Information Processing Systems}, 33,
+5824--5836.
 
 \end{thebibliography}
 

@@ -11,5 +11,6 @@ Goal : demonstrer feedback loop Dynamoscope → world model :
 """
 from .mini_rssm import MiniRSSM
 from .trainer import RSSMTrainer, TrainConfig
+from .pcgrad import pcgrad_step
 
-__all__ = ["MiniRSSM", "RSSMTrainer", "TrainConfig"]
+__all__ = ["MiniRSSM", "RSSMTrainer", "TrainConfig", "pcgrad_step"]
