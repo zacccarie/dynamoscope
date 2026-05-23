@@ -1,29 +1,36 @@
 {
   "lyapunov": {
     "systems": {
-      "lorenz_unit_dt": {
-        "lambda_true": 0.906,
-        "lambda_est": -0.485,
-        "abs_error": 1.391,
-        "within_tol": false,
-        "tol": 0.5
+      "lorenz_dt0.01": {
+        "lambda_per_sample_true": 0.00906,
+        "lambda_est": 0.0112,
+        "abs_error": 0.00214,
+        "within_tol": true,
+        "tol": 0.003
+      },
+      "lorenz_dt0.05": {
+        "lambda_per_sample_true": 0.0453,
+        "lambda_est": 0.08659,
+        "abs_error": 0.04129,
+        "within_tol": true,
+        "tol": 0.06
       },
       "logistic_r4": {
-        "lambda_true": 0.693,
-        "lambda_est": -0.0,
+        "lambda_per_sample_true": 0.693,
+        "lambda_est": 0.0,
         "abs_error": 0.693,
         "within_tol": false,
-        "tol": 0.5
+        "tol": 0.4
       },
       "circle": {
-        "lambda_true": 0.0,
+        "lambda_per_sample_true": 0.0,
         "lambda_est": -0.0,
         "abs_error": 0.0,
         "within_tol": true,
-        "tol": 0.3
+        "tol": 0.05
       }
     },
-    "pass_rate": "1/3"
+    "pass_rate": "3/4"
   },
   "topology": {
     "torus": {

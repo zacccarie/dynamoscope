@@ -1,18 +1,24 @@
 """SFASlownessRegularizer : Wiskott-Sejnowski 2002 slowness principle.
 
 Formulation classique SFA :
-    minimize ⟨(Δy)²⟩  s.t.  ⟨y⟩ = 0, ⟨y²⟩ = 1, ⟨y_i y_j⟩ = 0 (i ≠ j)
+    minimize ⟨(Δy)²⟩  s.t.  ⟨y⟩ = 0, ⟨y²⟩ = 1
 
 Notre version régularisateur :
-    L = mean‖z_{t+1} − z_t‖² / mean(var(z))
 
-Le dénominateur agit comme penalty implicite contre collapse (z = const minimise
-numérateur mais aussi dénominateur → ratio diverge).
+    mode="standardize" (default) :
+        z_std = (z − mean(z)) / std(z)   per-dim
+        L = mean‖Δ z_std‖²
+        → invariant à scale et offset, var(z) ne peut PAS croître pour
+        échapper à la pénalité (échec mode connu de "ratio").
+
+    mode="ratio" (legacy) :
+        L = mean‖Δz‖² / mean(var(z))
+        → simple mais peut être contourné en gonflant var(z).
 
 Use cases :
-- Encourager latents à capturer features lentement variant (semantic content,
-  scene identity) plutôt que features rapidement variant (motion, noise)
-- Force "scene memory" : utile pour world models où état doit persister
+- Encourager latents capturant features lentement variant (scene identity,
+  semantic content) plutôt que rapide (motion).
+- "Memory" pour world models où état doit persister.
 """
 from __future__ import annotations
 import torch
@@ -23,22 +29,28 @@ class SFASlownessRegularizer(nn.Module):
     """Penalty sur vitesse de variation des latents.
 
     Args:
-        order: 1 = première dérivée Δz, 2 = seconde dérivée Δ²z (acceleration).
-        normalize_by_variance: True = divise par var(z) pour éviter collapse.
+        order: 1 = première dérivée Δz, 2 = seconde dérivée Δ²z.
+        mode: "standardize" (default, robust) | "ratio" (legacy).
         weight: poids final.
     """
 
     def __init__(
         self,
         order: int = 1,
-        normalize_by_variance: bool = True,
+        mode: str = "standardize",
         weight: float = 1.0,
+        normalize_by_variance: bool | None = None,  # legacy kwarg
     ):
         super().__init__()
         if order not in (1, 2):
             raise ValueError(f"order must be 1 or 2, got {order}")
+        # Legacy compat
+        if normalize_by_variance is not None:
+            mode = "ratio" if normalize_by_variance else "raw"
+        if mode not in ("standardize", "ratio", "raw"):
+            raise ValueError(f"mode must be standardize|ratio|raw, got {mode}")
         self.order = order
-        self.normalize = normalize_by_variance
+        self.mode = mode
         self.weight = weight
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
@@ -54,16 +66,23 @@ class SFASlownessRegularizer(nn.Module):
         if T < self.order + 2:
             return z.sum() * 0.0
 
-        diff = z[1:] - z[:-1]  # (T-1, D)
+        if self.mode == "standardize":
+            # Per-dim mean-0 var-1 normalization. var(z) growth ne peut plus
+            # réduire la pénalité — projection robust sur sphère unitaire.
+            mean = z.mean(dim=0, keepdim=True)
+            std = z.std(dim=0, keepdim=True).clamp_min(1e-6)
+            z_use = (z - mean) / std
+        else:
+            z_use = z
+
+        diff = z_use[1:] - z_use[:-1]
         if self.order == 2:
-            diff = diff[1:] - diff[:-1]  # (T-2, D)
+            diff = diff[1:] - diff[:-1]
 
         sq_norm = (diff ** 2).sum(dim=1).mean()
 
-        if self.normalize:
+        if self.mode == "ratio":
             var = z.var(dim=0, unbiased=False).mean().clamp_min(1e-9)
-            loss = sq_norm / var
-        else:
-            loss = sq_norm
+            sq_norm = sq_norm / var
 
-        return self.weight * loss
+        return self.weight * sq_norm

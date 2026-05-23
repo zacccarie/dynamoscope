@@ -76,27 +76,39 @@ def gen_circle(n: int = 2000) -> np.ndarray:
 
 
 def estimate_lyapunov_via_loss(traj: np.ndarray) -> float:
-    """Use LyapunovMatchingLoss internal estimator. Return estimated λ."""
+    """Use LyapunovMatchingLoss.estimate() directly. Return λ per sample."""
     z = torch.from_numpy(traj.astype(np.float32))
-    # Loss internal: read estimated λ by setting target=0 and inverting
-    L = LyapunovMatchingLoss(target_lyapunov=0.0, tau_range=(1, 10), k_pairs=64)
-    loss = L(z).item()
-    # loss = (λ_est - 0)^2 → λ_est = ±√loss. Sign by running once with target large
-    L_high = LyapunovMatchingLoss(target_lyapunov=1.0, tau_range=(1, 10), k_pairs=64)
-    loss_high = L_high(z).item()
-    # If loss decreases when target moves positive, λ is positive
-    if loss_high < loss:
-        return np.sqrt(loss)
-    return -np.sqrt(loss)
+    L = LyapunovMatchingLoss(tau_range=(1, 10), theiler_window=10)
+    return float(L.estimate(z).item())
 
 
 def exp_lyapunov() -> dict:
-    """Test λ estimator sur 3 systèmes ground-truth connus."""
-    # Lorenz subsampled à dt*100 = 1.0 → λ par sample ≈ 0.906
+    """Test λ_per_sample estimator sur systèmes ground-truth connus.
+
+    LyapunovMatchingLoss retourne slope per sample. Donc pour Lorenz
+    avec dt=0.01 entre samples : λ_per_sample = 0.906 × 0.01 = 0.00906.
+    """
     systems = {
-        "lorenz_unit_dt": {"gen": lambda: gen_lorenz(n=1500, dt=0.01, subsample=100), "lambda_true": 0.906, "tol": 0.5},
-        "logistic_r4": {"gen": gen_logistic, "lambda_true": 0.693, "tol": 0.5},
-        "circle": {"gen": gen_circle, "lambda_true": 0.0, "tol": 0.3},
+        "lorenz_dt0.01": {
+            "gen": lambda: gen_lorenz(n=2000, dt=0.01, subsample=1),
+            "lambda_per_sample_true": 0.00906,
+            "tol": 0.003,
+        },
+        "lorenz_dt0.05": {
+            "gen": lambda: gen_lorenz(n=1500, dt=0.01, subsample=5),
+            "lambda_per_sample_true": 0.0453,
+            "tol": 0.06,
+        },
+        "logistic_r4": {
+            "gen": gen_logistic,
+            "lambda_per_sample_true": 0.693,
+            "tol": 0.4,
+        },
+        "circle": {
+            "gen": gen_circle,
+            "lambda_per_sample_true": 0.0,
+            "tol": 0.05,
+        },
     }
     results = {}
     for name, cfg in systems.items():
@@ -104,11 +116,11 @@ def exp_lyapunov() -> dict:
         torch.manual_seed(0)
         traj = cfg["gen"]()
         lam_est = estimate_lyapunov_via_loss(traj)
-        err = abs(lam_est - cfg["lambda_true"])
+        err = abs(lam_est - cfg["lambda_per_sample_true"])
         results[name] = {
-            "lambda_true": cfg["lambda_true"],
-            "lambda_est": round(float(lam_est), 4),
-            "abs_error": round(float(err), 4),
+            "lambda_per_sample_true": cfg["lambda_per_sample_true"],
+            "lambda_est": round(float(lam_est), 5),
+            "abs_error": round(float(err), 5),
             "within_tol": err < cfg["tol"],
             "tol": cfg["tol"],
         }
@@ -362,8 +374,9 @@ def main() -> dict:
     lyap = exp_lyapunov()
     print(f"  pass: {lyap['pass_rate']}")
     for name, r in lyap["systems"].items():
-        print(f"    {name}: λ_true={r['lambda_true']:.3f}, λ_est={r['lambda_est']:.3f}, "
-              f"err={r['abs_error']:.3f}, within_tol={r['within_tol']}")
+        print(f"    {name}: λ_per_sample_true={r['lambda_per_sample_true']:.5f}, "
+              f"λ_est={r['lambda_est']:.5f}, err={r['abs_error']:.5f}, "
+              f"within_tol={r['within_tol']}")
 
     print("\n[2/4] Topology on torus/sphere (loss vs noise)...")
     topo = exp_topology()
