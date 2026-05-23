@@ -2,7 +2,7 @@
 from __future__ import annotations
 from .base import TrajectoryProducer
 from .encoders import EncoderWrapper
-from .world_models import DreamerWrapper, VJEPAWrapper, RSSMSmallWrapper
+from .world_models import DreamerWrapper, VJEPA2Wrapper, RSSMSmallWrapper
 from ..encoder import ENCODER_REGISTRY
 
 
@@ -12,7 +12,7 @@ MODEL_REGISTRY: dict[str, type] = {
     **{name: lambda n=name: EncoderWrapper(n) for name in ENCODER_REGISTRY.keys()},
     # World models stubs
     "dreamer_v3_stub": DreamerWrapper,
-    "vjepa_stub": VJEPAWrapper,
+    "vjepa2_vitl": VJEPA2Wrapper,
     "rssm_small_stub": RSSMSmallWrapper,
 }
 

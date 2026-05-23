@@ -64,33 +64,86 @@ class DreamerWrapper(WorldModelWrapper):
         return np.zeros((frames.shape[0], self.latent_dim), dtype=np.float32)
 
 
-class VJEPAWrapper(WorldModelWrapper):
-    """V-JEPA (Bardes et al. 2024, Meta) joint embedding predictive arch.
+class VJEPA2Wrapper(WorldModelWrapper):
+    """V-JEPA 2 (Bardes et al. 2024, Meta) — REAL implementation via transformers.
 
-    NOT IMPLEMENTED YET — requires :
-        Weights via HuggingFace facebook/vjepa (~1-2GB)
-        transformers latest + custom decoder
+    ViT-L backbone, 326M params, output 1024d per clip after spatio-temporal patches.
+    Auto-download depuis HuggingFace facebook/vjepa2-vitl-fpc64-256 (~1.3GB).
 
-    Provided as extensibility template.
+    Per-frame strategy : pour chaque frame i, clip 16-frame centered window
+    (similar to VideoMAEWrapper) → mean pool → 1 vector 1024d per frame.
     """
-    def __init__(self, model_id: str = "facebook/vjepa-vit-h"):
+    def __init__(self, model_id: str = "facebook/vjepa2-vitl-fpc64-256", device: str | None = None):
+        import torch
+        from transformers import AutoModel
         self.model_id = model_id
-        self._available = False
+        if device is None:
+            device = "mps" if torch.backends.mps.is_available() else (
+                "cuda" if torch.cuda.is_available() else "cpu"
+            )
+        self.device = torch.device(device)
+        self.model = AutoModel.from_pretrained(model_id)
+        self.model.eval().to(self.device)
+        # ImageNet stats par défaut pour normalisation
+        self._mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 1, 3, 1, 1)
+        self._std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 1, 3, 1, 1)
+        self._available = True
 
     @property
     def name(self) -> str:
-        return "vjepa_stub"
+        return "vjepa2_vitl"
 
     @property
     def latent_dim(self) -> int:
-        return 1280  # ViT-H
+        return 1024
 
-    def produce_trajectory(self, frames: np.ndarray) -> np.ndarray:
-        if not self._available:
-            raise NotImplementedError(
-                "VJEPAWrapper stub. Download V-JEPA weights + transformers latest to enable."
-            )
-        return np.zeros((frames.shape[0], self.latent_dim), dtype=np.float32)
+    def produce_trajectory(self, frames: np.ndarray, batch_size: int = 2, clip_size: int = 16) -> np.ndarray:
+        """Per-frame V-JEPA 2 encoding via 16-frame centered window.
+
+        Args:
+            frames: (N, H, W, 3) float [0,1]
+            batch_size: clips per forward (V-JEPA gros, garder petit)
+            clip_size: 16 = V-JEPA standard
+        """
+        import torch
+        import cv2
+
+        n = frames.shape[0]
+        # Resize 256×256 attendu par V-JEPA 2 (peut differer selon variant)
+        target_size = 256
+        if frames.shape[1] != target_size:
+            frames_resized = np.stack([
+                cv2.resize(f, (target_size, target_size), interpolation=cv2.INTER_AREA)
+                for f in frames
+            ])
+        else:
+            frames_resized = frames
+
+        frames_u8 = (frames_resized * 255).clip(0, 255).astype(np.uint8)
+        half = clip_size // 2
+        out: list[np.ndarray] = []
+
+        with torch.no_grad():
+            for batch_start in range(0, n, batch_size):
+                batch_end = min(batch_start + batch_size, n)
+                batch_clips = []
+                for i in range(batch_start, batch_end):
+                    idxs = [min(max(0, i - half + 1 + k), n - 1) for k in range(clip_size)]
+                    clip = np.stack([frames_u8[j] for j in idxs])  # (16, H, W, 3)
+                    batch_clips.append(clip)
+                batch_arr = np.stack(batch_clips, axis=0)  # (B, 16, H, W, 3)
+                t = torch.from_numpy(batch_arr).permute(0, 1, 4, 2, 3).float().to(self.device) / 255.0
+                t = (t - self._mean) / self._std
+                output = self.model(t)
+                # last_hidden_state : (B, T_patches, 1024)
+                h = output.last_hidden_state
+                feats = h.mean(dim=1).float().cpu().numpy()
+                out.append(feats)
+        return np.concatenate(out, axis=0)
+
+
+# Backward-compat alias for registry
+VJEPAWrapper = VJEPA2Wrapper
 
 
 class RSSMSmallWrapper(WorldModelWrapper):
@@ -139,12 +192,12 @@ def list_world_model_wrappers() -> list[dict]:
             "to_enable": "pip install dreamer-pytorch + checkpoint",
         },
         {
-            "name": "vjepa_stub",
+            "name": "vjepa2_vitl",
             "category": "world_model",
-            "latent_dim": 1280,
-            "paper": "Bardes 2024",
-            "status": "stub",
-            "to_enable": "download facebook/vjepa weights",
+            "latent_dim": 1024,
+            "paper": "Bardes 2024 (Meta)",
+            "status": "available",
+            "to_enable": "auto-download facebook/vjepa2-vitl-fpc64-256 (~1.3GB)",
         },
         {
             "name": "rssm_small_stub",
