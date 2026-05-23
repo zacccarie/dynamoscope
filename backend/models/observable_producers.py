@@ -48,8 +48,8 @@ class DelayEmbedProducer(TrajectoryProducer):
 
     @property
     def name(self) -> str:
-        tau_str = self._tau if self._tau is not None else "auto"
-        return f"delay_{self._observable}_t{tau_str}_m{self._m}"
+        tau_str = str(self._tau) if self._tau is not None else "auto"
+        return f"delay_{self._observable}_{tau_str}_m{self._m}"
 
     @property
     def latent_dim(self) -> int:
