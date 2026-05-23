@@ -38,10 +38,12 @@ from backend.dna import compute_dna
 from backend.dynamics import analyse_trajectory
 
 
-N_REPEATS = 5
-N_EPOCHS = 12
+import os
+N_REPEATS = int(os.environ.get("DYNAMOSCOPE_N_SEEDS", "5"))
+N_EPOCHS = int(os.environ.get("DYNAMOSCOPE_N_EPOCHS", "12"))
 TARGET_SIZE = 64
 HELD_OUT_FRAMES = 60
+OUTPUT_TAG = os.environ.get("DYNAMOSCOPE_OUTPUT_TAG", "")
 
 
 def compute_metrics(z: np.ndarray) -> dict:
@@ -246,8 +248,10 @@ def main():
             for enc in ENCODERS
         },
     }
-    json.dump(out, open("results/baselines.json", "w"), indent=2, default=_json_default)
-    print(f"\n[saved] results/baselines.json")
+    suffix = f"_{OUTPUT_TAG}" if OUTPUT_TAG else ""
+    out_path = f"results/baselines{suffix}.json"
+    json.dump(out, open(out_path, "w"), indent=2, default=_json_default)
+    print(f"\n[saved] {out_path}")
 
 
 if __name__ == "__main__":

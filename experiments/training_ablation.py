@@ -45,9 +45,11 @@ from backend.dna import compute_dna
 from backend.dynamics import analyse_trajectory
 
 
-N_SEEDS = 5
-N_EPOCHS = 12
+import os
+N_SEEDS = int(os.environ.get("DYNAMOSCOPE_N_SEEDS", "5"))
+N_EPOCHS = int(os.environ.get("DYNAMOSCOPE_N_EPOCHS", "12"))
 TARGET_SIZE = 64
+OUTPUT_TAG = os.environ.get("DYNAMOSCOPE_OUTPUT_TAG", "")
 
 
 CONFIGS = {
@@ -258,8 +260,10 @@ def main():
             return o.tolist()
         raise TypeError(f"non-serializable {type(o)}")
 
-    json.dump(out, open("results/training_ablation.json", "w"), indent=2, default=_json_default)
-    print(f"\n[saved] results/training_ablation.json")
+    suffix = f"_{OUTPUT_TAG}" if OUTPUT_TAG else ""
+    out_path = f"results/training_ablation{suffix}.json"
+    json.dump(out, open(out_path, "w"), indent=2, default=_json_default)
+    print(f"\n[saved] {out_path}")
 
 
 if __name__ == "__main__":

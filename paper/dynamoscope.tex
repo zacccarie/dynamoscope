@@ -738,29 +738,45 @@ higher weight would be required for a true Lyapunov-matching regime.
 
 \begin{table}[h]
 \centering
-\caption{DNA score on three held-out regimes. Bootstrap 95\% CI
-over 5 repeats. Pretrained encoders are deterministic and produce
-zero-width intervals.}
+\caption{DNA score on three held-out regimes, 20 training repeats,
+30 epochs, bootstrap 95\% CI. Pretrained encoders are deterministic
+and produce zero-width intervals on identically-seeded held-out videos.}
 \label{tab:baselines}
-\begin{tabular}{lrrr}
+\begin{tabular}{lccc}
 \toprule
 Encoder & Smooth & Periodic & Chaotic \\
 \midrule
-mini-RSSM, baseline (2.8\,M) & 32.3 & 34.5 & 34.8 \\
-mini-RSSM, Dynamoscope (2.8\,M) & 20.6 & \textbf{43.8} & \textbf{38.9} \\
-ResNet-50 frozen (25\,M) & 40.2 & 32.4 & 38.2 \\
+mini-RSSM, baseline (2.8\,M) & 32.3 [31.4, 33.1] & 34.9 [33.2, 36.5] & 35.4 [34.2, 36.5] \\
+mini-RSSM, Dynamoscope (2.8\,M) & 22.0 [20.8, 23.3] & \textbf{39.7 [38.8, 40.6]} & 36.8 [35.9, 37.8] \\
+ResNet-50 frozen (25\,M) & 40.2 & 32.4 & \textbf{38.2} \\
 DINOv2-S frozen (22\,M) & \textbf{40.0} & 36.3 & 35.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-A 2.8M-parameter mini-RSSM trained with Phase~C losses surpasses
-both a frozen ResNet-50 (25M) and a frozen DINOv2-S (22M) on the
-periodic and chaotic DNA scores (Table~\ref{tab:baselines}). On
-smooth video, pretrained models dominate, consistent with the
-over-regularization finding above. This suggests Phase~C losses are
-most useful when target content has nontrivial dynamics that the
-losses can shape rather than suppress.
+At twenty training repeats, the picture is more nuanced than a
+small-sample experiment would suggest. On the \emph{periodic} regime
+the Phase~C--trained 2.8M mini-RSSM strictly dominates both frozen
+pretrained models with non-overlapping CIs. On the \emph{chaotic}
+regime ResNet-50 and the Dynamoscope mini-RSSM are statistically
+indistinguishable (overlapping CIs, $36.8$ vs.\ $38.2$). On the
+\emph{smooth} regime pretrained models clearly win, consistent with
+the over-regularization finding above. Phase~C losses are therefore
+most useful when target content has \emph{non-trivial} dynamics
+that the losses can shape rather than suppress.
+
+\subsection{Training Length: a Cautionary Result}
+
+Going from twelve to thirty epochs while keeping the same loss
+weights causes the Phase~C mini-RSSM to lose RQA determinism on
+periodic content: $\mathrm{DET}$ drops from $0.83$ to $0.38$
+(Welch $t=-13.6$, $p \approx 0$). The model has compressed the
+periodic structure too aggressively. This is a useful negative
+result: the Phase~C objective is regime-sensitive and weight-sensitive,
+and training-length is itself a hyperparameter that interacts with
+the loss schedule. We do not propose a fix here but expose it
+prominently as a direction for future scheduling-aware
+formulations of the diagnostic losses.
 
 \subsection{Honest Limitations}
 
