@@ -1223,26 +1223,54 @@ Hypothesis~3 is also falsified : all four metrics produce lags within
 $10$ frames of one another and $\mu_{\text{vis}}$ within $0.05$. The
 metric choice is not the binding constraint either.
 
-\paragraph{Synthesis of three falsifications.}
-The detection lag of $\approx 100$--$120$ frames ($\mu_{\text{vis}}
-\approx 0.5$) is robust across spatial resolution ($64$, $128$,
-$256$ px), temporal window ($15$, $30$, $60$, $120$ frames), and
-diagnostic metric (four different invariants). No single dimension
-explains it. The most parsimonious remaining explanation is that the
-rendered video itself loses information near $\mu=0$ : a Van der Pol
-limit cycle of radius $\sqrt{\mu}\approx 0.1$--$0.3$ at small $\mu$
-traces a region narrower than the trail of the playhead dot, so the
-\emph{visual} signal we extract observables from cannot distinguish it
-from a stationary point. This is not a spatial-pixel-resolution issue
-in the strict sense (our resolution sweep falsifies that), but rather
-an interaction between trail rendering width, the per-frame
-classical observable computation, and the metric thresholds, none of
-which dominate independently but which together produce a robust
-$\mu_{\text{vis}} \approx 0.5$ floor. A genuinely different signal
-representation --- multi-scale wavelet pre-processing of the trail,
-or replacing the trail rendering by an analytic phase-space
-projection --- would be required to push $\mu_{\text{vis}}$ below this
-floor. We list this as concrete future work.
+A fourth hypothesis follows naturally from the synthesis: maybe trail
+rendering itself dominates. A long trail might mask the cycle
+structure by overlapping with itself in pixel space when the cycle is
+small. We tested by varying \verb|trail_len| $\in \{1, 3, 6, 12, 24\}$.
+
+\begin{table}[h]
+\centering
+\caption{Trail-length sweep. Detection completely invariant.}
+\label{tab:trail-sweep}
+\begin{tabular}{rrr}
+\toprule
+trail\_len & Lag & $\mu_{\text{vis}}$ \\
+\midrule
+1, 3, 6, 12, 24 (all) & $+110$ & $+0.553$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Pearson correlation of \verb|trail_len| with lag is exactly $0.000$.
+Hypothesis 4 falsified.
+
+\paragraph{Synthesis after four falsifications.}
+The detection lag of $\approx 110$ frames ($\mu_{\text{vis}} \approx
+0.553$) is \emph{bedrock} : invariant across spatial resolution
+($1.10\times$ per doubling, expected $4\times$), temporal window
+($1.11\times$ per halving, expected $2\times$), diagnostic metric
+($1.00\times$ across four invariants), and trail length
+($0.00$ correlation). What \emph{does} vary the lag is the choice of
+classical observable feeding the delay embedding : in
+Table~\ref{tab:bifurcation},
+\texttt{delay\_motion} produced lag $+195$, \texttt{delay\_entropy}
+$+115$, \texttt{direct\_bme} $+120$, with no other parameter changed.
+The remaining sources of variance, after ruling out spatial,
+temporal, metric, and trail factors, are therefore (i) the
+$\mu$-response curve of the specific observable feeding the
+embedding, and (ii) the fixed empirical thresholds of the regime
+classifier ($\text{TH}_{\text{noise-diag}}, \text{TH}_{\text{regular-diag}},
+\text{TH}_{\text{converge-rel}}$).
+
+In other words, the multi-factor floor at $\mu_{\text{vis}} \approx
+0.5$ is not a rendering artefact but a property of the
+\emph{observable--classifier pair}. To push detection earlier one
+would need either a different observable whose temporal autocorrelation
+structure shifts more abruptly at $\mu=0$, or a regime classifier
+trained from data rather than thresholded by hand. We flag both as
+concrete next-experiments. The four falsified-hypotheses experiments
+together provide rigorous evidence that the lag is not what a
+casual reader might first assume.
 
 The regime-kind transitions reported by the classical pipelines (e.g.\
 \texttt{cycle} $\to$ \texttt{strange} for \texttt{delay\_entropy} at
