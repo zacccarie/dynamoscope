@@ -1,0 +1,32 @@
+services:
+  dynamoscope:
+    build: .
+    image: dynamoscope:latest
+    container_name: dynamoscope
+    ports:
+      - "8770:8770"
+    volumes:
+      # Persist analysis cache + experiments registry across restarts
+      - ./cache:/app/cache
+      # Mount videos folder for upload + CLI batch access
+      - ./videos:/app/videos
+    environment:
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+    restart: unless-stopped
+
+  # Optional : GPU variant (uncomment if NVIDIA Container Toolkit available)
+  # dynamoscope-gpu:
+  #   build: .
+  #   image: dynamoscope:gpu
+  #   ports:
+  #     - "8771:8770"
+  #   volumes:
+  #     - ./cache:/app/cache
+  #     - ./videos:/app/videos
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]

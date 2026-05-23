@@ -91,6 +91,17 @@ python -m backend.cli system lorenz --analyses all
 .venv/bin/python -m pytest tests/   # 50 tests, ~4s
 ```
 
+### Docker
+
+```bash
+docker compose up -d        # build + run, http://localhost:8770
+docker compose logs -f       # tail logs
+docker compose down          # stop
+```
+
+Cache (CLIP/DINOv2/wav2vec2 weights, experiments DB) persists via volume `./cache`.
+Videos folder mounted at `./videos`.
+
 ## Modules backend
 
 ```
