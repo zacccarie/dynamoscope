@@ -1,0 +1,712 @@
+{
+  "rows": [
+    {
+      "video": "bouncing_balls",
+      "model": "delay_motion_auto_m3",
+      "type": "classical",
+      "dna_score": 46.34,
+      "axis_chaos": 0.4932,
+      "axis_topology": 0.5278,
+      "axis_complexity": 0.5487,
+      "axis_spectral": 0.1403,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0814,
+      "axis_predictability": 0.6269,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "bouncing_balls",
+      "model": "delay_brightness_auto_m3",
+      "type": "classical",
+      "dna_score": 50.27,
+      "axis_chaos": 1.0,
+      "axis_topology": 0.4159,
+      "axis_complexity": 0.181,
+      "axis_spectral": 0.4978,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0922,
+      "axis_predictability": 0.481,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "bouncing_balls",
+      "model": "delay_entropy_auto_m3",
+      "type": "classical",
+      "dna_score": 51.38,
+      "axis_chaos": 0.9136,
+      "axis_topology": 0.4796,
+      "axis_complexity": 0.455,
+      "axis_spectral": 0.4232,
+      "axis_structure": 1.0,
+      "axis_causality": 0.1938,
+      "axis_predictability": 0.5945,
+      "axis_regime_confidence": 0.6872
+    },
+    {
+      "video": "bouncing_balls",
+      "model": "pca_obs_m3",
+      "type": "classical",
+      "dna_score": 46.65,
+      "axis_chaos": 0.6684,
+      "axis_topology": 0.3892,
+      "axis_complexity": 0.4497,
+      "axis_spectral": 0.5304,
+      "axis_structure": 0.977,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.4511,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "bouncing_balls",
+      "model": "direct_bme",
+      "type": "classical",
+      "dna_score": 48.3,
+      "axis_chaos": 0.88,
+      "axis_topology": 0.4796,
+      "axis_complexity": 0.4363,
+      "axis_spectral": 0.2823,
+      "axis_structure": 0.8548,
+      "axis_causality": 0.0659,
+      "axis_predictability": 0.537,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "bouncing_balls",
+      "model": "dinov2_vits14",
+      "type": "neural",
+      "dna_score": 48.44,
+      "axis_chaos": 0.712,
+      "axis_topology": 0.5889,
+      "axis_complexity": 0.6533,
+      "axis_spectral": 0.207,
+      "axis_structure": 0.3664,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.7852,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "bouncing_balls",
+      "model": "resnet50",
+      "type": "neural",
+      "dna_score": 48.37,
+      "axis_chaos": 0.4584,
+      "axis_topology": 0.5278,
+      "axis_complexity": 0.6093,
+      "axis_spectral": 0.26,
+      "axis_structure": 0.8548,
+      "axis_causality": 0.0228,
+      "axis_predictability": 0.8321,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "delay_motion_auto_m3",
+      "type": "classical",
+      "dna_score": 44.47,
+      "axis_chaos": 0.2284,
+      "axis_topology": 0.513,
+      "axis_complexity": 0.6043,
+      "axis_spectral": 0.252,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.6564,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "delay_brightness_auto_m3",
+      "type": "classical",
+      "dna_score": 41.59,
+      "axis_chaos": 0.5536,
+      "axis_topology": 0.513,
+      "axis_complexity": 0.405,
+      "axis_spectral": 0.2163,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.5364,
+      "axis_regime_confidence": 0.7035
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "delay_entropy_auto_m3",
+      "type": "classical",
+      "dna_score": 46.26,
+      "axis_chaos": 0.4596,
+      "axis_topology": 0.497,
+      "axis_complexity": 0.4753,
+      "axis_spectral": 0.3735,
+      "axis_structure": 1.0,
+      "axis_causality": 0.1329,
+      "axis_predictability": 0.6182,
+      "axis_regime_confidence": 0.6917
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "pca_obs_m3",
+      "type": "classical",
+      "dna_score": 42.98,
+      "axis_chaos": 0.7432,
+      "axis_topology": 0.4796,
+      "axis_complexity": 0.524,
+      "axis_spectral": 0.313,
+      "axis_structure": 0.8548,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.494,
+      "axis_regime_confidence": 0.6474
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "direct_bme",
+      "type": "classical",
+      "dna_score": 37.78,
+      "axis_chaos": 0.4036,
+      "axis_topology": 0.497,
+      "axis_complexity": 0.4643,
+      "axis_spectral": 0.3077,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.5555,
+      "axis_regime_confidence": 0.6795
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "dinov2_vits14",
+      "type": "neural",
+      "dna_score": 44.49,
+      "axis_chaos": 0.3196,
+      "axis_topology": 0.5666,
+      "axis_complexity": 0.6267,
+      "axis_spectral": 0.256,
+      "axis_structure": 0.8548,
+      "axis_causality": 0.0335,
+      "axis_predictability": 0.7932,
+      "axis_regime_confidence": 0.6445
+    },
+    {
+      "video": "double_pendulum_render",
+      "model": "resnet50",
+      "type": "neural",
+      "dna_score": 51.76,
+      "axis_chaos": 0.5064,
+      "axis_topology": 0.6089,
+      "axis_complexity": 0.7097,
+      "axis_spectral": 0.2387,
+      "axis_structure": 0.8548,
+      "axis_causality": 0.0687,
+      "axis_predictability": 0.7967,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "delay_motion_auto_m3",
+      "type": "classical",
+      "dna_score": 46.17,
+      "axis_chaos": 0.4652,
+      "axis_topology": 0.4159,
+      "axis_complexity": 0.4193,
+      "axis_spectral": 0.0009,
+      "axis_structure": 1.0,
+      "axis_causality": 0.5042,
+      "axis_predictability": 0.608,
+      "axis_regime_confidence": 0.8672
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "delay_brightness_auto_m3",
+      "type": "classical",
+      "dna_score": 48.82,
+      "axis_chaos": 0.3268,
+      "axis_topology": 0.4796,
+      "axis_complexity": 0.582,
+      "axis_spectral": 0.2551,
+      "axis_structure": 1.0,
+      "axis_causality": 0.2388,
+      "axis_predictability": 0.8792,
+      "axis_regime_confidence": 0.8143
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "delay_entropy_auto_m3",
+      "type": "classical",
+      "dna_score": 50.22,
+      "axis_chaos": 0.4524,
+      "axis_topology": 0.513,
+      "axis_complexity": 0.568,
+      "axis_spectral": 0.0337,
+      "axis_structure": 1.0,
+      "axis_causality": 0.3731,
+      "axis_predictability": 0.7372,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "pca_obs_m3",
+      "type": "classical",
+      "dna_score": 46.38,
+      "axis_chaos": 0.3776,
+      "axis_topology": 0.6356,
+      "axis_complexity": 0.742,
+      "axis_spectral": 0.0202,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.6712,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "direct_bme",
+      "type": "classical",
+      "dna_score": 45.56,
+      "axis_chaos": 0.43,
+      "axis_topology": 0.5278,
+      "axis_complexity": 0.4573,
+      "axis_spectral": 0.0242,
+      "axis_structure": 1.0,
+      "axis_causality": 0.1687,
+      "axis_predictability": 0.6964,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "dinov2_vits14",
+      "type": "neural",
+      "dna_score": 41.6,
+      "axis_chaos": 0.816,
+      "axis_topology": 0.3219,
+      "axis_complexity": 0.4393,
+      "axis_spectral": 0.2112,
+      "axis_structure": 0.3664,
+      "axis_causality": 0.0347,
+      "axis_predictability": 0.7882,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "rotating_shapes",
+      "model": "resnet50",
+      "type": "neural",
+      "dna_score": 41.37,
+      "axis_chaos": 0.746,
+      "axis_topology": 0.4394,
+      "axis_complexity": 0.4417,
+      "axis_spectral": 0.1039,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.0382,
+      "axis_predictability": 0.7765,
+      "axis_regime_confidence": 0.9584
+    },
+    {
+      "video": "color_morph",
+      "model": "delay_motion_auto_m3",
+      "type": "classical",
+      "dna_score": 50.1,
+      "axis_chaos": 0.4052,
+      "axis_topology": 0.4605,
+      "axis_complexity": 0.4623,
+      "axis_spectral": 0.3251,
+      "axis_structure": 1.0,
+      "axis_causality": 0.4063,
+      "axis_predictability": 0.4146,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "color_morph",
+      "model": "delay_brightness_auto_m3",
+      "type": "classical",
+      "dna_score": 45.99,
+      "axis_chaos": 0.0032,
+      "axis_topology": 0.3584,
+      "axis_complexity": 0.475,
+      "axis_spectral": 0.5357,
+      "axis_structure": 0.7453,
+      "axis_causality": 0.2589,
+      "axis_predictability": 0.7193,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "color_morph",
+      "model": "delay_entropy_auto_m3",
+      "type": "classical",
+      "dna_score": 55.29,
+      "axis_chaos": 0.3348,
+      "axis_topology": 0.513,
+      "axis_complexity": 0.6123,
+      "axis_spectral": 0.6635,
+      "axis_structure": 1.0,
+      "axis_causality": 0.3472,
+      "axis_predictability": 0.7208,
+      "axis_regime_confidence": 0.6396
+    },
+    {
+      "video": "color_morph",
+      "model": "pca_obs_m3",
+      "type": "classical",
+      "dna_score": 46.61,
+      "axis_chaos": 0.4408,
+      "axis_topology": 0.3219,
+      "axis_complexity": 0.525,
+      "axis_spectral": 0.6712,
+      "axis_structure": 0.6106,
+      "axis_causality": 0.0703,
+      "axis_predictability": 0.6385,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "color_morph",
+      "model": "direct_bme",
+      "type": "classical",
+      "dna_score": 47.03,
+      "axis_chaos": 1.0,
+      "axis_topology": 0.4394,
+      "axis_complexity": 0.4937,
+      "axis_spectral": 0.3606,
+      "axis_structure": 0.7327,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.4191,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "color_morph",
+      "model": "dinov2_vits14",
+      "type": "neural",
+      "dna_score": 44.35,
+      "axis_chaos": 0.424,
+      "axis_topology": 0.2773,
+      "axis_complexity": 0.5413,
+      "axis_spectral": 0.4302,
+      "axis_structure": 0.6106,
+      "axis_causality": 0.1365,
+      "axis_predictability": 0.823,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "color_morph",
+      "model": "resnet50",
+      "type": "neural",
+      "dna_score": 44.49,
+      "axis_chaos": 0.5444,
+      "axis_topology": 0.3219,
+      "axis_complexity": 0.4297,
+      "axis_spectral": 0.4156,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.1772,
+      "axis_predictability": 0.8064,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "delay_motion_auto_m3",
+      "type": "classical",
+      "dna_score": 40.69,
+      "axis_chaos": 0.2952,
+      "axis_topology": 0.3584,
+      "axis_complexity": 0.2757,
+      "axis_spectral": 0.4905,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0953,
+      "axis_predictability": 0.3752,
+      "axis_regime_confidence": 0.876
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "delay_brightness_auto_m3",
+      "type": "classical",
+      "dna_score": 35.52,
+      "axis_chaos": 0.092,
+      "axis_topology": 0.1386,
+      "axis_complexity": 0.33,
+      "axis_spectral": 0.4614,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0132,
+      "axis_predictability": 0.706,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "delay_entropy_auto_m3",
+      "type": "classical",
+      "dna_score": 40.64,
+      "axis_chaos": 0.0356,
+      "axis_topology": 0.4394,
+      "axis_complexity": 0.371,
+      "axis_spectral": 0.4001,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.5368,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "pca_obs_m3",
+      "type": "classical",
+      "dna_score": 44.38,
+      "axis_chaos": 0.34,
+      "axis_topology": 0.5889,
+      "axis_complexity": 0.607,
+      "axis_spectral": 0.3034,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.6336,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "direct_bme",
+      "type": "classical",
+      "dna_score": 32.28,
+      "axis_chaos": 0.032,
+      "axis_topology": 0.3219,
+      "axis_complexity": 0.3313,
+      "axis_spectral": 0.4253,
+      "axis_structure": 0.6106,
+      "axis_causality": 0.094,
+      "axis_predictability": 0.36,
+      "axis_regime_confidence": 0.652
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "dinov2_vits14",
+      "type": "neural",
+      "dna_score": 24.95,
+      "axis_chaos": 0.0608,
+      "axis_topology": 0.0,
+      "axis_complexity": 0.2923,
+      "axis_spectral": 0.4958,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.0745,
+      "axis_predictability": 0.6299,
+      "axis_regime_confidence": 0.6488
+    },
+    {
+      "video": "reaction_diffusion",
+      "model": "resnet50",
+      "type": "neural",
+      "dna_score": 24.81,
+      "axis_chaos": 0.044,
+      "axis_topology": 0.0,
+      "axis_complexity": 0.3713,
+      "axis_spectral": 0.4699,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.0783,
+      "axis_predictability": 0.6238,
+      "axis_regime_confidence": 0.6428
+    },
+    {
+      "video": "game_of_life",
+      "model": "delay_motion_auto_m3",
+      "type": "classical",
+      "dna_score": 45.68,
+      "axis_chaos": 0.2992,
+      "axis_topology": 0.5889,
+      "axis_complexity": 0.5703,
+      "axis_spectral": 0.4091,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0,
+      "axis_predictability": 0.593,
+      "axis_regime_confidence": 0.678
+    },
+    {
+      "video": "game_of_life",
+      "model": "delay_brightness_auto_m3",
+      "type": "classical",
+      "dna_score": 44.42,
+      "axis_chaos": 0.3888,
+      "axis_topology": 0.497,
+      "axis_complexity": 0.54,
+      "axis_spectral": 0.4024,
+      "axis_structure": 0.8695,
+      "axis_causality": 0.0761,
+      "axis_predictability": 0.5895,
+      "axis_regime_confidence": 0.6798
+    },
+    {
+      "video": "game_of_life",
+      "model": "delay_entropy_auto_m3",
+      "type": "classical",
+      "dna_score": 50.06,
+      "axis_chaos": 0.4252,
+      "axis_topology": 0.5545,
+      "axis_complexity": 0.626,
+      "axis_spectral": 0.394,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0338,
+      "axis_predictability": 0.6213,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "game_of_life",
+      "model": "pca_obs_m3",
+      "type": "classical",
+      "dna_score": 49.43,
+      "axis_chaos": 0.5388,
+      "axis_topology": 0.4394,
+      "axis_complexity": 0.5423,
+      "axis_spectral": 0.4591,
+      "axis_structure": 1.0,
+      "axis_causality": 0.0588,
+      "axis_predictability": 0.6731,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "game_of_life",
+      "model": "direct_bme",
+      "type": "classical",
+      "dna_score": 40.77,
+      "axis_chaos": 0.2784,
+      "axis_topology": 0.4796,
+      "axis_complexity": 0.505,
+      "axis_spectral": 0.4244,
+      "axis_structure": 0.6106,
+      "axis_causality": 0.0201,
+      "axis_predictability": 0.5804,
+      "axis_regime_confidence": 0.6857
+    },
+    {
+      "video": "game_of_life",
+      "model": "dinov2_vits14",
+      "type": "neural",
+      "dna_score": 45.67,
+      "axis_chaos": 0.3924,
+      "axis_topology": 0.5278,
+      "axis_complexity": 0.6363,
+      "axis_spectral": 0.1534,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.1635,
+      "axis_predictability": 0.8275,
+      "axis_regime_confidence": 1.0
+    },
+    {
+      "video": "game_of_life",
+      "model": "resnet50",
+      "type": "neural",
+      "dna_score": 40.24,
+      "axis_chaos": 0.342,
+      "axis_topology": 0.5278,
+      "axis_complexity": 0.4463,
+      "axis_spectral": 0.2847,
+      "axis_structure": 0.2442,
+      "axis_causality": 0.0235,
+      "axis_predictability": 0.8085,
+      "axis_regime_confidence": 0.6759
+    }
+  ],
+  "summary_by_type": {
+    "classical": {
+      "axis_chaos": {
+        "mean": 0.44349333333333335,
+        "std": 0.2589936819478207,
+        "n": 30
+      },
+      "axis_topology": {
+        "mean": 0.4621133333333332,
+        "std": 0.09514575041599188,
+        "n": 30
+      },
+      "axis_complexity": {
+        "mean": 0.48596999999999996,
+        "std": 0.11295528953233368,
+        "n": 30
+      },
+      "axis_spectral": {
+        "mean": 0.34654666666666667,
+        "std": 0.17221657243779478,
+        "n": 30
+      },
+      "axis_structure": {
+        "mean": 0.8784766666666667,
+        "std": 0.2121613736181861,
+        "n": 30
+      },
+      "axis_causality": {
+        "mean": 0.11083333333333331,
+        "std": 0.13802925615808975,
+        "n": 30
+      },
+      "axis_predictability": {
+        "mean": 0.5908066666666668,
+        "std": 0.11528748684147046,
+        "n": 30
+      },
+      "axis_regime_confidence": {
+        "mean": 0.8767300000000001,
+        "std": 0.15005246004869985,
+        "n": 30
+      }
+    },
+    "neural": {
+      "axis_chaos": {
+        "mean": 0.44716666666666666,
+        "std": 0.2329622835472634,
+        "n": 12
+      },
+      "axis_topology": {
+        "mean": 0.39235833333333336,
+        "std": 0.204976142751351,
+        "n": 12
+      },
+      "axis_complexity": {
+        "mean": 0.5164333333333334,
+        "std": 0.12487634772935273,
+        "n": 12
+      },
+      "axis_spectral": {
+        "mean": 0.29386666666666666,
+        "std": 0.12284021690345914,
+        "n": 12
+      },
+      "axis_structure": {
+        "mean": 0.4477500000000001,
+        "std": 0.2558353132388099,
+        "n": 12
+      },
+      "axis_causality": {
+        "mean": 0.07095,
+        "std": 0.055988101414497,
+        "n": 12
+      },
+      "axis_predictability": {
+        "mean": 0.77425,
+        "std": 0.06795846157764314,
+        "n": 12
+      },
+      "axis_regime_confidence": {
+        "mean": 0.8808666666666666,
+        "std": 0.16170237234568396,
+        "n": 12
+      }
+    }
+  },
+  "weighted_deltas_classical_minus_neural": {
+    "chaos": -0.033059999999999756,
+    "topology": 1.883384999999996,
+    "complexity": -0.1827800000000007,
+    "spectral": 0.8428800000000001,
+    "structure": 2.153633333333333,
+    "causality": 0.7178999999999996,
+    "predictability": -1.6509899999999986,
+    "regime_confidence": -0.04136666666666455
+  },
+  "interpretation": {
+    "favors_classical": [
+      "structure",
+      "topology",
+      "spectral",
+      "causality"
+    ],
+    "favors_neural": [
+      "predictability"
+    ],
+    "neutral": [
+      "chaos",
+      "regime_confidence",
+      "complexity"
+    ],
+    "top_driver_classical": [
+      "structure",
+      2.153633333333333
+    ],
+    "top_driver_neural": [
+      "predictability",
+      -1.6509899999999986
+    ]
+  }
+}

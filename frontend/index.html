@@ -661,6 +661,10 @@
       <span>Lmax/N <b id="phaseStLmax">—</b></span>
       <span>conv <b id="phaseStConv">—</b></span>
     </div>
+
+    <div style="font-size: 10px; color: var(--cyan); margin-bottom: 6px;">DIAGRAMME DE RÉCURRENCE</div>
+    <canvas id="phaseRecCanvas" width="240" height="240" style="width:100%; max-width: 240px; image-rendering: pixelated; border: 1px solid var(--border); background: #000;"></canvas>
+    <p style="font-size: 9px; color: rgba(255,255,255,0.5); margin: 4px 0 0 0;">point clair = états ε-proches · diagonales = déterminisme</p>
   </div>
 
   <!-- Frame inspector + kNN -->
@@ -2878,12 +2882,19 @@ async function runPhaseEmbed() {
     rawCoords = null;
     renderTrajectory();
 
-    // Run regime classification on these coords
-    const rRegime = await fetch('/api/regime', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coords: coords3 }),
-    });
+    // Run regime classification + dynamics (for recurrence plot) in parallel
+    const [rRegime, rDyn] = await Promise.all([
+      fetch('/api/regime', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coords: coords3 }),
+      }),
+      fetch('/api/dynamics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coords: coords3 }),
+      }),
+    ]);
     if (rRegime.ok) {
       const reg = await rRegime.json();
       const v = reg.verdict;
@@ -2904,6 +2915,11 @@ async function runPhaseEmbed() {
       document.getElementById('phaseStLmax').textContent = reg.metrics.max_diag_ratio.toFixed(3);
       document.getElementById('phaseStConv').textContent = reg.metrics.convergence_rate.toFixed(3);
     }
+    // Draw recurrence plot in phase canvas
+    if (rDyn.ok) {
+      const d = await rDyn.json();
+      drawPhaseRecurrence(d.recurrence);
+    }
     setStatus(`phase-space rendu · ${data.n} états · ${phaseMode}`);
   } catch (err) {
     setStatus('phase error: ' + err.message);
@@ -2911,6 +2927,30 @@ async function runPhaseEmbed() {
 }
 
 document.getElementById('phaseRunBtn').addEventListener('click', runPhaseEmbed);
+
+// Recurrence plot canvas dedicated to phase-space tab
+function drawPhaseRecurrence(R) {
+  const cvs = document.getElementById('phaseRecCanvas');
+  if (!cvs || !R || R.length === 0) return;
+  const n = R.length;
+  cvs.width = n; cvs.height = n;
+  const ctx = cvs.getContext('2d');
+  const img = ctx.createImageData(n, n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const v = R[i][j];
+      const idx = (i * n + j) * 4;
+      if (v) {
+        const dt = Math.abs(i - j) / n;
+        img.data[idx]     = Math.round(255 * dt);
+        img.data[idx + 1] = Math.round(40 + 180 * (1 - dt));
+        img.data[idx + 2] = Math.round(220 - 100 * dt);
+        img.data[idx + 3] = 255;
+      } else img.data[idx + 3] = 0;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
 
 // init observables list dropdown au chargement
 window.addEventListener('DOMContentLoaded', () => { loadPhaseObservables(); });

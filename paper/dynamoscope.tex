@@ -778,6 +778,91 @@ the loss schedule. We do not propose a fix here but expose it
 prominently as a direction for future scheduling-aware
 formulations of the diagnostic losses.
 
+\subsection{Classical Observables vs. Neural Encoders}
+
+To stress-test the assumption that large pretrained perceptual
+encoders are the natural front-end for dynamical video analysis, we
+add a \emph{classical} pipeline drawn from time-series analysis :
+twelve pixel-level observables (luminance, contrast, RGB means,
+inter-frame motion, motion centroid X/Y, Shannon entropy, Sobel
+edges, luminance centroid X/Y) followed by Takens delay
+embedding~\cite{takens1981}, principal components, or direct
+axis selection. The resulting trajectory bypasses any deep encoder.
+
+On the six procedural video benchmark (bouncing balls, double
+pendulum render, rotating shapes, color morph, reaction-diffusion,
+Game of Life), classical observables surpass both pretrained
+encoders on the DNA composite (Table~\ref{tab:classical-vs-neural}).
+
+\begin{table}[h]
+\centering
+\caption{Cross-paradigm comparison on six procedural videos, single
+run. DNA composite (higher is more dynamics-rich). Time excludes
+disk I/O.}
+\label{tab:classical-vs-neural}
+\begin{tabular}{llrr}
+\toprule
+Model & Paradigm & DNA mean & Time/video \\
+\midrule
+delay\_entropy\_auto\_m3 & classical & \textbf{48.98} & 0.09\,s \\
+pca\_obs\_m3 & classical & 46.07 & 0.10\,s \\
+delay\_motion\_auto\_m3 & classical & 45.57 & 0.10\,s \\
+delay\_brightness\_auto\_m3 & classical & 44.44 & 0.09\,s \\
+ResNet-50 (25\,M) & neural & 41.84 & 0.20\,s \\
+DINOv2-S (22\,M) & neural & 41.58 & 0.28\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This result, in isolation, would be misleading. A bias audit
+(\verb|experiments/dna_bias_audit.py|) decomposes the gap by axis
+(Table~\ref{tab:bias-audit}). The classical advantage is driven by
+\emph{structure} ($+2.15$), \emph{topology} ($+1.88$), \emph{spectral}
+($+0.84$), and \emph{causality} ($+0.72$) — axes that together
+weight 0.66 of the DNA composite. The only axis that favors neural
+encoders is \emph{predictability} ($-1.65$), reflecting their
+greater latent smoothness. Other axes are statistically tied.
+
+\begin{table}[h]
+\centering
+\caption{DNA axis decomposition, classical minus neural means.
+Weighted column is $\Delta\!\times w \!\times\! 100$.}
+\label{tab:bias-audit}
+\begin{tabular}{lrrrrr}
+\toprule
+Axis & $w$ & Classical & Neural & $\Delta$ & Weighted \\
+\midrule
+structure & 0.05 & 0.88 & 0.45 & $+0.43$ & $+2.15$ \\
+topology & 0.27 & 0.46 & 0.39 & $+0.07$ & $+1.88$ \\
+spectral & 0.16 & 0.35 & 0.29 & $+0.05$ & $+0.84$ \\
+causality & 0.18 & 0.11 & 0.07 & $+0.04$ & $+0.72$ \\
+chaos & 0.09 & 0.44 & 0.45 & $\approx 0$ & $-0.03$ \\
+complexity & 0.06 & 0.49 & 0.52 & $\approx 0$ & $-0.18$ \\
+regime\_conf. & 0.10 & 0.88 & 0.88 & $\approx 0$ & $-0.04$ \\
+predictability & 0.09 & 0.59 & 0.77 & $-0.18$ & $-1.65$ \\
+\midrule
+\textbf{Total} & & & & & $+3.69$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Interpretation.}
+DNA composite is, by construction, a dynamics-richness score that
+weights topology, causality, and spectral structure heavily. On that
+specific axis-set classical observable pipelines win because they
+preserve raw pixel-level temporal signal that neural encoders
+aggressively smooth away in pursuit of semantic invariance.
+We do \emph{not} interpret this as ``classical $>$ neural'' in
+general — for tasks requiring semantic invariance (retrieval,
+classification, action recognition) the opposite is expected.
+The takeaway is more nuanced: for \emph{dynamical analysis of
+video as a trajectory in latent space}, raw pixel-level observables
+embedded via Takens are a remarkably strong, GPU-free baseline that
+deserves to be benchmarked against routinely. We have promoted these
+observable producers to first-class objects in the model registry
+so they participate in cross-model benchmarks alongside encoders and
+world models.
+
 \subsection{Honest Limitations}
 
 We do not claim Phase~C losses uniformly improve representations.
