@@ -1,0 +1,923 @@
+{
+  "mu_values": [
+    -0.5,
+    -0.3,
+    -0.1,
+    -0.02,
+    0.0,
+    0.02,
+    0.1,
+    0.3,
+    0.5,
+    1.0
+  ],
+  "rows": [
+    {
+      "mu": -0.5,
+      "raw": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.9299
+        },
+        "lyapunov": -0.027,
+        "correlation_dim": 1.054,
+        "max_diag_ratio": 0.3125,
+        "convergence_rate": 2.3745
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "noise",
+          "label": "Stochastique",
+          "description": "Aucune structure d\u00e9terministe \u2014 diagonales r\u00e9currence absentes, trajectoire ne revisite pas ses \u00e9tats.",
+          "confidence": -1.4764
+        },
+        "dna_score": 20.13,
+        "lyapunov": 0.0208,
+        "max_diag_ratio": 0.5641,
+        "convergence_rate": 0.1014,
+        "correlation_dim": 3.08
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "noise",
+          "label": "Stochastique",
+          "description": "Aucune structure d\u00e9terministe \u2014 diagonales r\u00e9currence absentes, trajectoire ne revisite pas ses \u00e9tats.",
+          "confidence": -0.9496
+        },
+        "dna_score": 26.07,
+        "lyapunov": 0.0164,
+        "max_diag_ratio": 0.4324,
+        "convergence_rate": 0.5152,
+        "correlation_dim": 5.476
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "cycle",
+          "label": "Cycle limite",
+          "description": "Oscillation p\u00e9riodique stable \u2014 trajectoire suit boucle ferm\u00e9e, \u00e9tats voisins restent parall\u00e8les.",
+          "confidence": 0.9297
+        },
+        "dna_score": 18.3,
+        "lyapunov": 0.0,
+        "max_diag_ratio": 0.9324,
+        "convergence_rate": 0.0,
+        "correlation_dim": 0.0
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22482.15.",
+          "confidence": 0.8575
+        },
+        "dna_score": 27.31,
+        "lyapunov": 0.041,
+        "max_diag_ratio": 0.325,
+        "convergence_rate": 0.1444,
+        "correlation_dim": 2.145
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.6382
+        },
+        "dna_score": 17.0,
+        "lyapunov": -0.0044,
+        "max_diag_ratio": 0.325,
+        "convergence_rate": 0.5513,
+        "correlation_dim": 0.792
+      }
+    },
+    {
+      "mu": -0.3,
+      "raw": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.8194
+        },
+        "lyapunov": -0.0272,
+        "correlation_dim": 1.44,
+        "max_diag_ratio": 0.325,
+        "convergence_rate": 1.6835
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "noise",
+          "label": "Stochastique",
+          "description": "Aucune structure d\u00e9terministe \u2014 diagonales r\u00e9currence absentes, trajectoire ne revisite pas ses \u00e9tats.",
+          "confidence": -1.5884
+        },
+        "dna_score": 18.47,
+        "lyapunov": 0.0371,
+        "max_diag_ratio": 0.5921,
+        "convergence_rate": -0.0538,
+        "correlation_dim": 17.363
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22482.39.",
+          "confidence": 0.8368
+        },
+        "dna_score": 32.02,
+        "lyapunov": 0.0139,
+        "max_diag_ratio": 0.3438,
+        "convergence_rate": 0.1209,
+        "correlation_dim": 2.387
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "cycle",
+          "label": "Cycle limite",
+          "description": "Oscillation p\u00e9riodique stable \u2014 trajectoire suit boucle ferm\u00e9e, \u00e9tats voisins restent parall\u00e8les.",
+          "confidence": 0.9297
+        },
+        "dna_score": 18.3,
+        "lyapunov": 0.0,
+        "max_diag_ratio": 0.9324,
+        "convergence_rate": 0.0,
+        "correlation_dim": 0.0
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22482.21.",
+          "confidence": 0.8163
+        },
+        "dna_score": 24.87,
+        "lyapunov": -0.0071,
+        "max_diag_ratio": 0.3625,
+        "convergence_rate": -0.1249,
+        "correlation_dim": 2.214
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22480.63.",
+          "confidence": 0.8163
+        },
+        "dna_score": 18.69,
+        "lyapunov": -0.0073,
+        "max_diag_ratio": 0.3625,
+        "convergence_rate": 0.2348,
+        "correlation_dim": 0.627
+      }
+    },
+    {
+      "mu": -0.1,
+      "raw": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.6451
+        },
+        "lyapunov": -0.0077,
+        "correlation_dim": 1.424,
+        "max_diag_ratio": 0.5125,
+        "convergence_rate": 0.5945
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22480.59.",
+          "confidence": 1.0
+        },
+        "dna_score": 58.47,
+        "lyapunov": 0.2994,
+        "max_diag_ratio": 0.1923,
+        "convergence_rate": 0.1535,
+        "correlation_dim": 0.586
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.91.",
+          "confidence": 0.9255
+        },
+        "dna_score": 50.11,
+        "lyapunov": 0.1189,
+        "max_diag_ratio": 0.2632,
+        "convergence_rate": 0.5128,
+        "correlation_dim": 1.905
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22482.18.",
+          "confidence": 1.0
+        },
+        "dna_score": 52.52,
+        "lyapunov": 0.1017,
+        "max_diag_ratio": 0.0781,
+        "convergence_rate": -0.1477,
+        "correlation_dim": 2.181
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22482.01.",
+          "confidence": 1.0
+        },
+        "dna_score": 46.17,
+        "lyapunov": 0.07,
+        "max_diag_ratio": 0.1,
+        "convergence_rate": 0.2409,
+        "correlation_dim": 2.014
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.52.",
+          "confidence": 1.0
+        },
+        "dna_score": 43.62,
+        "lyapunov": 0.0822,
+        "max_diag_ratio": 0.075,
+        "convergence_rate": 0.3616,
+        "correlation_dim": 1.521
+      }
+    },
+    {
+      "mu": -0.02,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.17.",
+          "confidence": 0.6375
+        },
+        "lyapunov": -0.0015,
+        "correlation_dim": 1.172,
+        "max_diag_ratio": 0.525,
+        "convergence_rate": 0.1155
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.27.",
+          "confidence": 1.0
+        },
+        "dna_score": 53.5,
+        "lyapunov": 0.2639,
+        "max_diag_ratio": 0.1053,
+        "convergence_rate": 0.0334,
+        "correlation_dim": 1.271
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7526
+        },
+        "dna_score": 46.55,
+        "lyapunov": 0.0604,
+        "max_diag_ratio": 0.0625,
+        "convergence_rate": 1.2662,
+        "correlation_dim": 1.532
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7546
+        },
+        "dna_score": 48.21,
+        "lyapunov": 0.0643,
+        "max_diag_ratio": 0.0676,
+        "convergence_rate": 1.2789,
+        "correlation_dim": 1.694
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.69.",
+          "confidence": 1.0
+        },
+        "dna_score": 44.69,
+        "lyapunov": 0.0254,
+        "max_diag_ratio": 0.075,
+        "convergence_rate": 0.4017,
+        "correlation_dim": 1.685
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.6688
+        },
+        "dna_score": 41.77,
+        "lyapunov": 0.0956,
+        "max_diag_ratio": 0.1,
+        "convergence_rate": 0.7427,
+        "correlation_dim": 1.539
+      }
+    },
+    {
+      "mu": 0.0,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.15.",
+          "confidence": 0.6375
+        },
+        "lyapunov": -0.0,
+        "correlation_dim": 1.152,
+        "max_diag_ratio": 0.525,
+        "convergence_rate": 0.0
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.59.",
+          "confidence": 1.0
+        },
+        "dna_score": 49.11,
+        "lyapunov": 0.1071,
+        "max_diag_ratio": 0.1528,
+        "convergence_rate": 0.2043,
+        "correlation_dim": 1.591
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7161
+        },
+        "dna_score": 46.95,
+        "lyapunov": 0.0616,
+        "max_diag_ratio": 0.0946,
+        "convergence_rate": 1.038,
+        "correlation_dim": 1.376
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7348
+        },
+        "dna_score": 47.1,
+        "lyapunov": 0.0354,
+        "max_diag_ratio": 0.0541,
+        "convergence_rate": 1.1549,
+        "correlation_dim": 1.411
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.59.",
+          "confidence": 0.995
+        },
+        "dna_score": 42.42,
+        "lyapunov": -0.0022,
+        "max_diag_ratio": 0.2,
+        "convergence_rate": 0.1959,
+        "correlation_dim": 1.593
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.6702
+        },
+        "dna_score": 46.7,
+        "lyapunov": 0.0957,
+        "max_diag_ratio": 0.1125,
+        "convergence_rate": 0.7511,
+        "correlation_dim": 1.58
+      }
+    },
+    {
+      "mu": 0.02,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.17.",
+          "confidence": 0.6375
+        },
+        "lyapunov": 0.0012,
+        "correlation_dim": 1.173,
+        "max_diag_ratio": 0.525,
+        "convergence_rate": -0.1089
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "noise",
+          "label": "Stochastique",
+          "description": "Aucune structure d\u00e9terministe \u2014 diagonales r\u00e9currence absentes, trajectoire ne revisite pas ses \u00e9tats.",
+          "confidence": 0.672
+        },
+        "dna_score": 43.14,
+        "lyapunov": 0.1476,
+        "max_diag_ratio": 0.027,
+        "convergence_rate": 0.4189,
+        "correlation_dim": 1.217
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7372
+        },
+        "dna_score": 42.38,
+        "lyapunov": 0.0823,
+        "max_diag_ratio": 0.1757,
+        "convergence_rate": 1.1702,
+        "correlation_dim": 1.243
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.6984
+        },
+        "dna_score": 43.04,
+        "lyapunov": 0.0429,
+        "max_diag_ratio": 0.0676,
+        "convergence_rate": 0.9278,
+        "correlation_dim": 1.467
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.41.",
+          "confidence": 0.9813
+        },
+        "dna_score": 41.6,
+        "lyapunov": 0.0032,
+        "max_diag_ratio": 0.2125,
+        "convergence_rate": 0.2104,
+        "correlation_dim": 1.413
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7225
+        },
+        "dna_score": 37.96,
+        "lyapunov": 0.0773,
+        "max_diag_ratio": 0.0375,
+        "convergence_rate": 1.078,
+        "correlation_dim": 1.231
+      }
+    },
+    {
+      "mu": 0.1,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.29.",
+          "confidence": 0.6375
+        },
+        "lyapunov": -0.0007,
+        "correlation_dim": 1.29,
+        "max_diag_ratio": 0.525,
+        "convergence_rate": -0.3661
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.90.",
+          "confidence": 1.0
+        },
+        "dna_score": 51.09,
+        "lyapunov": 0.1748,
+        "max_diag_ratio": 0.0897,
+        "convergence_rate": 0.0887,
+        "correlation_dim": 1.895
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.8417
+        },
+        "dna_score": 39.29,
+        "lyapunov": 0.0847,
+        "max_diag_ratio": 0.0541,
+        "convergence_rate": 1.8234,
+        "correlation_dim": 0.761
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7253
+        },
+        "dna_score": 41.05,
+        "lyapunov": 0.0466,
+        "max_diag_ratio": 0.0541,
+        "convergence_rate": 1.0958,
+        "correlation_dim": 1.299
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.50.",
+          "confidence": 0.9813
+        },
+        "dna_score": 40.51,
+        "lyapunov": -0.0104,
+        "max_diag_ratio": 0.2125,
+        "convergence_rate": 0.1031,
+        "correlation_dim": 1.504
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7256
+        },
+        "dna_score": 41.98,
+        "lyapunov": 0.0995,
+        "max_diag_ratio": 0.05,
+        "convergence_rate": 1.0978,
+        "correlation_dim": 1.276
+      }
+    },
+    {
+      "mu": 0.3,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.17.",
+          "confidence": 0.6375
+        },
+        "lyapunov": -0.0003,
+        "correlation_dim": 1.171,
+        "max_diag_ratio": 0.525,
+        "convergence_rate": -0.0595
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.36.",
+          "confidence": 1.0
+        },
+        "dna_score": 48.34,
+        "lyapunov": 0.1836,
+        "max_diag_ratio": 0.1154,
+        "convergence_rate": 0.0284,
+        "correlation_dim": 1.356
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.9268
+        },
+        "dna_score": 40.69,
+        "lyapunov": -0.2045,
+        "max_diag_ratio": 0.1486,
+        "convergence_rate": 2.3553,
+        "correlation_dim": 0.202
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.8206
+        },
+        "dna_score": 38.19,
+        "lyapunov": 0.0281,
+        "max_diag_ratio": 0.0676,
+        "convergence_rate": 1.6915,
+        "correlation_dim": 0.923
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.30.",
+          "confidence": 0.8025
+        },
+        "dna_score": 36.84,
+        "lyapunov": 0.0143,
+        "max_diag_ratio": 0.375,
+        "convergence_rate": 0.2667,
+        "correlation_dim": 1.301
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7141
+        },
+        "dna_score": 40.75,
+        "lyapunov": 0.1417,
+        "max_diag_ratio": 0.075,
+        "convergence_rate": 1.0256,
+        "correlation_dim": 0.957
+      }
+    },
+    {
+      "mu": 0.5,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.14.",
+          "confidence": 0.6513
+        },
+        "lyapunov": -0.001,
+        "correlation_dim": 1.144,
+        "max_diag_ratio": 0.5125,
+        "convergence_rate": -0.0338
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.58.",
+          "confidence": 0.6965
+        },
+        "dna_score": 44.62,
+        "lyapunov": 0.1222,
+        "max_diag_ratio": 0.4714,
+        "convergence_rate": -0.0984,
+        "correlation_dim": 1.578
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.872
+        },
+        "dna_score": 41.89,
+        "lyapunov": 0.1628,
+        "max_diag_ratio": 0.2973,
+        "convergence_rate": 2.0124,
+        "correlation_dim": 0.623
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7985
+        },
+        "dna_score": 42.91,
+        "lyapunov": 0.0624,
+        "max_diag_ratio": 0.2973,
+        "convergence_rate": 1.5531,
+        "correlation_dim": 1.062
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.31.",
+          "confidence": 0.8163
+        },
+        "dna_score": 34.61,
+        "lyapunov": -0.0662,
+        "max_diag_ratio": 0.3625,
+        "convergence_rate": 0.2956,
+        "correlation_dim": 1.311
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.6957
+        },
+        "dna_score": 47.91,
+        "lyapunov": 0.2455,
+        "max_diag_ratio": 0.15,
+        "convergence_rate": 0.9104,
+        "correlation_dim": 0.988
+      }
+    },
+    {
+      "mu": 1.0,
+      "raw": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.08.",
+          "confidence": 0.6788
+        },
+        "lyapunov": -0.004,
+        "correlation_dim": 1.076,
+        "max_diag_ratio": 0.4875,
+        "convergence_rate": -0.0704
+      },
+      "delay_motion_auto_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.55.",
+          "confidence": 1.0
+        },
+        "dna_score": 51.75,
+        "lyapunov": 0.1469,
+        "max_diag_ratio": 0.0571,
+        "convergence_rate": 0.0567,
+        "correlation_dim": 1.551
+      },
+      "delay_brightness_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7432
+        },
+        "dna_score": 42.46,
+        "lyapunov": 0.1726,
+        "max_diag_ratio": 0.0946,
+        "convergence_rate": 1.2075,
+        "correlation_dim": 0.976
+      },
+      "delay_entropy_auto_m3": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.7327
+        },
+        "dna_score": 43.28,
+        "lyapunov": 0.0794,
+        "max_diag_ratio": 0.0676,
+        "convergence_rate": 1.1421,
+        "correlation_dim": 1.405
+      },
+      "pca_obs_m3": {
+        "verdict": {
+          "kind": "strange",
+          "label": "Attracteur \u00e9trange",
+          "description": "Chaos d\u00e9terministe born\u00e9 \u2014 trajectoire repli\u00e9e, sensible aux conditions initiales. Dimension fractale D\u22481.38.",
+          "confidence": 0.83
+        },
+        "dna_score": 40.95,
+        "lyapunov": 0.0292,
+        "max_diag_ratio": 0.35,
+        "convergence_rate": 0.3041,
+        "correlation_dim": 1.379
+      },
+      "direct_bme": {
+        "verdict": {
+          "kind": "fixed",
+          "label": "Point fixe",
+          "description": "Syst\u00e8me converge vers \u00e9tat stable \u2014 attracteur ponctuel, rayon trajectoire d\u00e9cro\u00eet au fil du temps.",
+          "confidence": 0.697
+        },
+        "dna_score": 41.2,
+        "lyapunov": 0.1023,
+        "max_diag_ratio": 0.0875,
+        "convergence_rate": 0.9187,
+        "correlation_dim": 0.993
+      }
+    }
+  ],
+  "detections": {
+    "raw": {
+      "detected_mu": -0.2,
+      "max_diff_idx": 1,
+      "max_diff": 1.089,
+      "diffs": [
+        0.6909999999999998,
+        1.089,
+        0.47900000000000004,
+        0.1155,
+        0.1089,
+        0.2572,
+        0.3066,
+        0.0257,
+        0.03660000000000001
+      ]
+    },
+    "delay_motion_auto_m3": {
+      "detected_mu": 0.060000000000000005,
+      "max_diff_idx": 5,
+      "max_diff": 0.3302,
+      "diffs": [
+        0.1552,
+        0.20729999999999998,
+        0.1201,
+        0.1709,
+        0.21459999999999999,
+        0.3302,
+        0.0603,
+        0.1268,
+        0.15510000000000002
+      ]
+    },
+    "delay_brightness_auto_m3": {
+      "detected_mu": 0.75,
+      "max_diff_idx": 8,
+      "max_diff": 0.8049,
+      "diffs": [
+        0.3943,
+        0.3919,
+        0.7534,
+        0.22819999999999996,
+        0.13219999999999987,
+        0.6532,
+        0.5319000000000003,
+        0.3429000000000002,
+        0.8049
+      ]
+    },
+    "delay_entropy_auto_m3": {
+      "detected_mu": -0.060000000000000005,
+      "max_diff_idx": 2,
+      "max_diff": 1.4265999999999999,
+      "diffs": [
+        0.0,
+        0.1477,
+        1.4265999999999999,
+        0.12399999999999989,
+        0.22710000000000008,
+        0.16800000000000015,
+        0.5956999999999999,
+        0.13840000000000008,
+        0.41100000000000003
+      ]
+    },
+    "pca_obs_m3": {
+      "detected_mu": -0.2,
+      "max_diff_idx": 1,
+      "max_diff": 0.3658,
+      "diffs": [
+        0.2693,
+        0.3658,
+        0.1608,
+        0.2058,
+        0.014500000000000013,
+        0.1073,
+        0.1636,
+        0.02889999999999998,
+        0.008500000000000008
+      ]
+    },
+    "direct_bme": {
+      "detected_mu": -0.060000000000000005,
+      "max_diff_idx": 2,
+      "max_diff": 0.38110000000000005,
+      "diffs": [
+        0.3165,
+        0.12679999999999997,
+        0.38110000000000005,
+        0.008399999999999963,
+        0.3269000000000001,
+        0.01980000000000004,
+        0.07220000000000004,
+        0.11520000000000008,
+        0.008299999999999974
+      ]
+    }
+  },
+  "ground_truth_mu_star": 0.0,
+  "models": [
+    "delay_motion_auto_m3",
+    "delay_brightness_auto_m3",
+    "delay_entropy_auto_m3",
+    "pca_obs_m3",
+    "direct_bme"
+  ],
+  "n_frames": 80
+}
