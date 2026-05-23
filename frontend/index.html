@@ -482,6 +482,7 @@
     <button class="tab" data-tab="causal">causal</button>
     <button class="tab" data-tab="topology">topology</button>
     <button class="tab" data-tab="sindy">SINDy · φ</button>
+    <button class="tab" data-tab="phase">phase-space</button>
     <button class="tab" data-tab="inspect">inspect</button>
     <button class="tab" data-tab="segments">segments</button>
     <button class="tab" data-tab="clusters">clusters</button>
@@ -577,6 +578,89 @@
       <div id="emergenceLadder" style="margin-top:8px;"></div>
     </div>
     <div class="panel-actions"><button id="sindyBtn" title="SINDy : sparse regression sur library polynomiale → trouve équations différentielles dz/dt = f(z). Pour Lorenz, retrouve équations originales avec R²>0.99.">discover equations</button></div>
+  </div>
+
+  <!-- Phase space : classical observable + Takens delay embedding + verdict -->
+  <div class="tab-panel" data-panel="phase">
+    <h2>PHASE SPACE · CLASSICAL EMBEDDING</h2>
+    <p style="font-size:10px; color: rgba(255,255,255,0.55); margin-bottom: 10px;">
+      Pipeline classique : 12 observables pixel-level → Takens delay / PCA / direct embed → trajectoire phase-space + verdict régime. Complémentaire au pipeline neuronal.
+    </p>
+
+    <div class="form-row" style="margin-bottom: 10px;">
+      <label style="font-size: 10px; color: var(--cyan); display:block; margin-bottom: 4px;">MODE</label>
+      <div style="display:flex; gap: 4px;">
+        <button class="phase-mode active" data-mode="delay" style="flex:1; font-size: 10px; padding: 6px;">Délai</button>
+        <button class="phase-mode" data-mode="pca" style="flex:1; font-size: 10px; padding: 6px;">PCA</button>
+        <button class="phase-mode" data-mode="direct" style="flex:1; font-size: 10px; padding: 6px;">Direct</button>
+      </div>
+    </div>
+
+    <div id="phaseDelayGrp">
+      <div class="form-row" style="margin-bottom: 8px;">
+        <label for="phaseObs" style="font-size: 10px; color: var(--cyan);">OBSERVABLE s(t)</label>
+        <select id="phaseObs" style="width: 100%;"></select>
+      </div>
+      <div class="form-row" style="margin-bottom: 8px;">
+        <label style="font-size: 10px; color: var(--cyan); display:flex; justify-content:space-between;">
+          <span>DÉLAI τ</span><span id="phaseTauVal">auto</span>
+        </label>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <input id="phaseTau" type="range" min="1" max="60" value="0" step="1" style="flex:1;">
+          <button id="phaseTauAuto" class="btn-mini" style="font-size: 9px; padding: 4px 8px;">auto</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="phaseDirectGrp" hidden>
+      <div class="form-row" style="margin-bottom: 6px;">
+        <label style="font-size: 10px; color: var(--cyan);">AXE X</label>
+        <select id="phaseAxX" style="width: 100%;"></select>
+      </div>
+      <div class="form-row" style="margin-bottom: 6px;">
+        <label style="font-size: 10px; color: var(--cyan);">AXE Y</label>
+        <select id="phaseAxY" style="width: 100%;"></select>
+      </div>
+      <div class="form-row" style="margin-bottom: 6px;">
+        <label style="font-size: 10px; color: var(--cyan);">AXE Z</label>
+        <select id="phaseAxZ" style="width: 100%;"></select>
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-bottom: 10px;">
+      <label style="font-size: 10px; color: var(--cyan); display:flex; justify-content:space-between;">
+        <span>DIMENSION m</span><span id="phaseMVal">3</span>
+      </label>
+      <input id="phaseM" type="range" min="2" max="9" value="3" step="1" style="width: 100%;">
+    </div>
+
+    <div class="panel-actions" style="margin-bottom: 14px;">
+      <button id="phaseRunBtn" title="Calcule la trajectoire reconstruite + métriques + verdict régime">Reconstruire</button>
+    </div>
+
+    <div id="phaseVerdict" style="padding: 10px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; background: rgba(0,0,0,0.3);">
+      <div style="font-size: 10px; color: var(--cyan); margin-bottom: 4px;">VERDICT</div>
+      <div id="phaseVerdictLabel" style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">—</div>
+      <div id="phaseVerdictDesc" style="font-size: 10px; color: rgba(255,255,255,0.7); line-height: 1.4; margin-bottom: 6px;">en attente</div>
+      <div style="display: flex; gap: 8px; align-items: center; font-size: 10px;">
+        <span style="color: rgba(255,255,255,0.5);">confiance</span>
+        <div style="flex:1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px;">
+          <div id="phaseConfBar" style="height:100%; background: var(--cyan); width:0%; border-radius:2px;"></div>
+        </div>
+        <span id="phaseConfVal">—</span>
+      </div>
+    </div>
+
+    <div style="font-size: 10px; color: var(--cyan); margin-bottom: 6px;">PARAMÈTRES</div>
+    <div class="sindy-meta" style="margin-bottom: 10px;">
+      <span>τ <b id="phaseStTau">—</b></span>
+      <span>m <b id="phaseStM">—</b></span>
+      <span>N <b id="phaseStN">—</b></span>
+      <span>λ <b id="phaseStLyap">—</b></span>
+      <span>D <b id="phaseStCdim">—</b></span>
+      <span>Lmax/N <b id="phaseStLmax">—</b></span>
+      <span>conv <b id="phaseStConv">—</b></span>
+    </div>
   </div>
 
   <!-- Frame inspector + kNN -->
@@ -2701,6 +2785,135 @@ async function computeSindyEmergence() {
   } catch (err) { setStatus('sindy error: ' + err.message); }
 }
 document.getElementById('sindyBtn').addEventListener('click', computeSindyEmergence);
+
+// ─── Phase-space classical embedding + regime classifier ───
+let phaseObservablesList = null;
+let phaseMode = 'delay';
+
+async function loadPhaseObservables() {
+  if (phaseObservablesList) return phaseObservablesList;
+  const r = await fetch('/api/observables/list');
+  phaseObservablesList = await r.json();
+  // populate selects
+  const fill = (id, defaultKey) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (const k of phaseObservablesList.keys) {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = phaseObservablesList.labels[k] || k;
+      if (k === defaultKey) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  };
+  fill('phaseObs', 'motion');
+  fill('phaseAxX', 'brightness');
+  fill('phaseAxY', 'motion');
+  fill('phaseAxZ', 'entropy');
+  return phaseObservablesList;
+}
+
+document.querySelectorAll('.phase-mode').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.phase-mode').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    phaseMode = btn.dataset.mode;
+    const delayGrp = document.getElementById('phaseDelayGrp');
+    const directGrp = document.getElementById('phaseDirectGrp');
+    delayGrp.hidden = (phaseMode !== 'delay');
+    directGrp.hidden = (phaseMode !== 'direct');
+  });
+});
+
+document.getElementById('phaseM').addEventListener('input', (e) => {
+  document.getElementById('phaseMVal').textContent = e.target.value;
+});
+document.getElementById('phaseTau').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value, 10);
+  document.getElementById('phaseTauVal').textContent = v === 0 ? 'auto' : v;
+});
+document.getElementById('phaseTauAuto').addEventListener('click', () => {
+  document.getElementById('phaseTau').value = 0;
+  document.getElementById('phaseTauVal').textContent = 'auto';
+});
+
+async function runPhaseEmbed() {
+  if (!cacheKey) { setStatus('no video loaded'); return; }
+  await loadPhaseObservables();
+  setStatus('reconstruction phase-space…', true);
+  const m = parseInt(document.getElementById('phaseM').value, 10);
+
+  let params = `mode=${phaseMode}&m=${m}`;
+  if (phaseMode === 'delay') {
+    const obs = document.getElementById('phaseObs').value;
+    const tauVal = parseInt(document.getElementById('phaseTau').value, 10);
+    params += `&observable=${obs}`;
+    if (tauVal > 0) params += `&tau=${tauVal}`;
+  } else if (phaseMode === 'direct') {
+    const xs = [
+      document.getElementById('phaseAxX').value,
+      document.getElementById('phaseAxY').value,
+      document.getElementById('phaseAxZ').value,
+    ];
+    params += `&keys=${xs.join(',')}`;
+  }
+
+  try {
+    const r = await fetch(`/api/embed/${cacheKey}?${params}`, { method: 'POST' });
+    if (!r.ok) throw new Error(`embed HTTP ${r.status}`);
+    const data = await r.json();
+    const coords = data.coords;
+
+    // Update params display
+    document.getElementById('phaseStTau').textContent = data.tau ?? '—';
+    document.getElementById('phaseStM').textContent = data.m ?? coords[0]?.length ?? '—';
+    document.getElementById('phaseStN').textContent = data.n;
+
+    // Take first 3 dims for 3D viz (drop others)
+    const coords3 = coords.map(c => [c[0] || 0, c[1] || 0, c[2] || 0]);
+
+    // Replace current trajectory in 3D scene
+    trajCoords = coords3;
+    rawCoords = null;
+    renderTrajectory();
+
+    // Run regime classification on these coords
+    const rRegime = await fetch('/api/regime', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords: coords3 }),
+    });
+    if (rRegime.ok) {
+      const reg = await rRegime.json();
+      const v = reg.verdict;
+      document.getElementById('phaseVerdictLabel').textContent = v.label;
+      document.getElementById('phaseVerdictDesc').textContent = v.description;
+      const pct = Math.round(v.confidence * 100);
+      document.getElementById('phaseConfBar').style.width = `${pct}%`;
+      document.getElementById('phaseConfVal').textContent = `${pct}%`;
+      // colour by regime kind
+      const colors = {
+        fixed: '#ffaa44', noise: '#888888', strange: '#ff4488',
+        cycle: '#44ddff', torus: '#aa88ff', unknown: '#888888',
+      };
+      document.getElementById('phaseConfBar').style.background = colors[v.kind] || 'var(--cyan)';
+      // metrics
+      document.getElementById('phaseStLyap').textContent = reg.metrics.lyapunov.toFixed(3);
+      document.getElementById('phaseStCdim').textContent = reg.metrics.correlation_dim.toFixed(2);
+      document.getElementById('phaseStLmax').textContent = reg.metrics.max_diag_ratio.toFixed(3);
+      document.getElementById('phaseStConv').textContent = reg.metrics.convergence_rate.toFixed(3);
+    }
+    setStatus(`phase-space rendu · ${data.n} états · ${phaseMode}`);
+  } catch (err) {
+    setStatus('phase error: ' + err.message);
+  }
+}
+
+document.getElementById('phaseRunBtn').addEventListener('click', runPhaseEmbed);
+
+// init observables list dropdown au chargement
+window.addEventListener('DOMContentLoaded', () => { loadPhaseObservables(); });
 
 // ─── Save / export / history ───────────────────────────────
 function snapshotMetrics() {

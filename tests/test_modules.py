@@ -86,7 +86,13 @@ def test_dna_composite_in_range(fake_latents_2048, lorenz_traj):
     out = compute_dna(fake_latents_2048, lorenz_traj[:fake_latents_2048.shape[0]])
     assert 0 <= out["composite_score"] <= 100
     assert "label" in out
-    assert len(out["axes"]) == 7
+    # 8 axes incl. regime_confidence (added via observables pipeline)
+    assert len(out["axes"]) == 8
+    assert "regime_confidence" in out["axes"]
+    assert "regime_verdict" in out
+    assert out["regime_verdict"]["kind"] in (
+        "fixed", "noise", "strange", "cycle", "torus", "unknown",
+    )
 
 
 def test_clip01_clamps():

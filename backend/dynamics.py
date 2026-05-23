@@ -255,6 +255,65 @@ def correlation_dimension(traj: np.ndarray, n_eps: int = 14) -> float:
     return float(slope)
 
 
+def max_diagonal_ratio(R: np.ndarray) -> float:
+    """Lmax / N : longueur max d'une diagonale (hors principale) / N.
+
+    Indicateur de régularité : si trajectoire est cycle limite, on a
+    de longues diagonales parallèles → ratio proche de 1. Si chaos pur,
+    diagonales très courtes → ratio proche de 0.
+
+    Port direct de la métrique max_diag de phase-space-video.
+    """
+    n = R.shape[0]
+    if n < 4:
+        return 0.0
+    max_diag = 0
+    theiler = max(4, int(round(n * 0.02)))
+    for off in range(theiler + 1, n):
+        run = 0
+        for i in range(n - off):
+            if R[i, i + off]:
+                run += 1
+                if run > max_diag:
+                    max_diag = run
+            else:
+                run = 0
+    return max_diag / n
+
+
+def convergence_rate(coords: np.ndarray) -> float:
+    """Mesure décroissance relative du rayon trajectoire vs barycentre.
+
+    Si trajectoire converge vers point fixe : rayon décroît linéairement,
+    convergence_rate > 0 (typiquement > 0.5 pour point fixe net).
+    Si attracteur étendu (cycle/chaos) : rayon stable → ≈ 0.
+    Si divergence : rayon croît → < 0.
+
+    Calcule slope linéaire de r_i = ‖coords_i − barycentre‖ vs i,
+    normalisé par N et meanR.
+
+    Port direct de convergenceRate de phase-space-video.
+    """
+    n, m = coords.shape
+    if n < 4:
+        return 0.0
+    c = coords.mean(axis=0)
+    radii = np.linalg.norm(coords - c, axis=1)
+    mean_r = float(radii.mean())
+    if mean_r < 1e-12:
+        return 0.0
+    xs = np.arange(n, dtype=np.float64)
+    # slope = cov(x, r) / var(x)
+    x_mean = xs.mean()
+    r_mean = radii.mean()
+    cov_xr = ((xs - x_mean) * (radii - r_mean)).sum()
+    var_x = ((xs - x_mean) ** 2).sum()
+    if var_x < 1e-12:
+        return 0.0
+    slope = cov_xr / var_x
+    return float(-slope * n / mean_r)
+
+
 def analyse_trajectory(coords: np.ndarray, max_n: int = 600) -> dict:
     """Pipeline complet analyse dynamique : Lyapunov + RQA + corr.dim + recurrence.
 
@@ -264,7 +323,8 @@ def analyse_trajectory(coords: np.ndarray, max_n: int = 600) -> dict:
 
     Returns:
         Dict avec lyapunov, correlation_dim, epsilon, rqa {RR/DET/LAM},
-        divergence_curve, recurrence matrix binary.
+        divergence_curve, recurrence matrix binary, max_diag_ratio,
+        convergence_rate (pour regime classifier).
     """
     n = coords.shape[0]
     if n > max_n:
@@ -277,12 +337,16 @@ def analyse_trajectory(coords: np.ndarray, max_n: int = 600) -> dict:
     R, eps = recurrence_matrix(traj, max_n=300)
     rqa = rqa_stats(R)
     d2 = correlation_dimension(traj)
+    max_diag = max_diagonal_ratio(R)
+    conv = convergence_rate(traj)
 
     return {
         "lyapunov": round(lam, 4),
         "correlation_dim": round(d2, 3),
         "epsilon": round(eps, 4),
         "rqa": {k: round(v, 4) for k, v in rqa.items()},
+        "max_diag_ratio": round(max_diag, 4),
+        "convergence_rate": round(conv, 4),
         "divergence_curve": div_curve.tolist(),
         "recurrence": R.tolist(),
         "recurrence_size": R.shape[0],

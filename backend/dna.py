@@ -22,6 +22,7 @@ from .dynamics import analyse_trajectory
 from .spectral import dmd, power_spectrum
 from .multiscale import spectral_slope
 from .topology import persistent_homology
+from .regime_classifier import classify_from_analysis
 
 
 def _clip01(x: float) -> float:
@@ -92,6 +93,10 @@ def compute_dna(latents: np.ndarray, coords_3d: np.ndarray) -> dict:
     else:
         causality = 0.0
 
+    # 7. Régime confidence : verdict heuristique depuis dyn metrics
+    # (port phase-space-video). Donne 8e axe DNA + label régime.
+    regime_verdict = classify_from_analysis(dyn, embedding_dim=coords_3d.shape[1])
+
     # Normalisation : ré-calibrée empiriquement via ablation study sur 6 systèmes canoniques.
     # Voir backend/dna_validation.py. axis_variance ~ discrimination power.
     axes = {
@@ -102,22 +107,21 @@ def compute_dna(latents: np.ndarray, coords_3d: np.ndarray) -> dict:
         "structure": _clip01(cluster_density / 2.0),
         "causality": _clip01(causality * 1.2),           # KSG TE excess vs shuffle, échelle empirique
         "predictability": _clip01(predictability),
+        "regime_confidence": _clip01(regime_verdict.confidence),  # 8e axe : verdict classifier
     }
 
-    # Composite weights : équilibre discrimination empirique (ablation study)
-    # + thematic coverage. Sur 6 systèmes canoniques, variance par axe :
-    # topology=0.32, causality=0.28, spectral=0.24, predictability=0.06,
-    # chaos=0.06, complexity=0.02, structure=0.02.
-    # Weights blend empirical discrimination with floor 0.06 per axis
-    # to keep all dimensions interpretable.
+    # Composite weights : empirical discrimination + thematic coverage.
+    # regime_confidence ajouté avec poids 0.10 — interpretation directe régime.
+    # Réajustement weights existants pour somme = 1.0.
     weights = {
-        "topology": 0.30,        # most discriminating (var=0.32)
-        "causality": 0.20,       # 2nd (var=0.28, KSG TE excess)
-        "spectral": 0.18,        # 3rd (var=0.24)
-        "predictability": 0.10,
-        "chaos": 0.10,
+        "topology": 0.27,
+        "causality": 0.18,
+        "spectral": 0.16,
+        "regime_confidence": 0.10,
+        "predictability": 0.09,
+        "chaos": 0.09,
         "complexity": 0.06,
-        "structure": 0.06,
+        "structure": 0.05,
     }
     composite = sum(axes[k] * weights[k] for k in axes) * 100
 
@@ -140,6 +144,7 @@ def compute_dna(latents: np.ndarray, coords_3d: np.ndarray) -> dict:
         "axes": {k: round(v, 4) for k, v in axes.items()},
         "weights": weights,
         "label": label,
+        "regime_verdict": regime_verdict.to_dict(),
         "n_clusters": int(n_clusters),
         "raw_metrics": {
             "lyapunov": round(lyap, 4),
@@ -150,5 +155,7 @@ def compute_dna(latents: np.ndarray, coords_3d: np.ndarray) -> dict:
             "n_clusters": int(n_clusters),
             "predictability_proxy": round(predictability, 4),
             "causality_proxy": round(causality, 4),
+            "max_diag_ratio": dyn.get("max_diag_ratio", 0.0),
+            "convergence_rate": dyn.get("convergence_rate", 0.0),
         },
     }

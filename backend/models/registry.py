@@ -3,6 +3,11 @@ from __future__ import annotations
 from .base import TrajectoryProducer
 from .encoders import EncoderWrapper
 from .world_models import DreamerWrapper, VJEPA2Wrapper, RSSMSmallWrapper
+from .observable_producers import (
+    DelayEmbedProducer,
+    PCAObservableProducer,
+    DirectObservableProducer,
+)
 from ..encoder import ENCODER_REGISTRY
 
 
@@ -14,6 +19,12 @@ MODEL_REGISTRY: dict[str, type] = {
     "dreamer_v3_stub": DreamerWrapper,
     "vjepa2_vitl": VJEPA2Wrapper,
     "rssm_small_stub": RSSMSmallWrapper,
+    # Observable-based (classical phase-space embedding)
+    "delay_motion_auto_m3": lambda: DelayEmbedProducer("motion", tau=None, m=3),
+    "delay_brightness_auto_m3": lambda: DelayEmbedProducer("brightness", tau=None, m=3),
+    "delay_entropy_auto_m3": lambda: DelayEmbedProducer("entropy", tau=None, m=3),
+    "pca_obs_m3": lambda: PCAObservableProducer(m=3),
+    "direct_bme": lambda: DirectObservableProducer(["brightness", "motion", "entropy"]),
 }
 
 
@@ -35,4 +46,9 @@ def list_all_models() -> list[dict]:
     """Liste full des models disponibles + leur info."""
     from .encoders import list_encoder_wrappers
     from .world_models import list_world_model_wrappers
-    return list_encoder_wrappers() + list_world_model_wrappers()
+    from .observable_producers import list_observable_producers
+    return (
+        list_encoder_wrappers()
+        + list_world_model_wrappers()
+        + list_observable_producers()
+    )

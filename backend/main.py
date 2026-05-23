@@ -287,6 +287,144 @@ def list_encoders() -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────
+# Observables + Takens embedding + regime classifier (phase-space-video port)
+# ──────────────────────────────────────────────────────────────────
+
+from .observables import compute_observables, OBSERVABLE_KEYS, OBSERVABLE_LABELS
+from .embedding import auto_tau, delay_embed, pca_embed, direct_embed
+from .regime_classifier import classify_from_analysis
+
+
+_OBSERVABLES_CACHE: dict[str, dict[str, np.ndarray]] = {}
+
+
+def _get_or_compute_observables(cache_key: str) -> dict[str, np.ndarray]:
+    """Cache miss → re-sample frames + compute observables."""
+    if cache_key in _OBSERVABLES_CACHE:
+        return _OBSERVABLES_CACHE[cache_key]
+    # Trouve la vidéo via cache_key dans VIDEOS_DIR
+    candidates = list(VIDEOS_DIR.glob(f"upload_*"))
+    # Match cache_key par re-hash. Plus simple : sauvegarde mapping cache_key → path
+    # dans _LATENTS_CACHE déjà loaded. Fallback : re-sample any matching upload.
+    for v in candidates:
+        try:
+            ck = _video_hash(v, "resnet50", 200)  # encoder/max_frames standard
+            if ck == cache_key:
+                frames, _ = sample_frames(v, max_frames=200)
+                obs = compute_observables(frames)
+                _OBSERVABLES_CACHE[cache_key] = obs
+                return obs
+        except Exception:
+            continue
+    raise HTTPException(status_code=404, detail=f"video for cache_key {cache_key} not found")
+
+
+@app.get("/api/observables/list")
+def observables_list() -> dict:
+    """Liste 12 observables disponibles + labels FR."""
+    return {
+        "keys": OBSERVABLE_KEYS,
+        "labels": OBSERVABLE_LABELS,
+    }
+
+
+@app.post("/api/observables/{cache_key}")
+def observables_compute(cache_key: str) -> JSONResponse:
+    """Calcule 12 observables raw sur frames cachées."""
+    obs = _get_or_compute_observables(cache_key)
+    return JSONResponse({
+        "channels": {k: obs[k].tolist() for k in OBSERVABLE_KEYS},
+        "keys": OBSERVABLE_KEYS,
+        "labels": OBSERVABLE_LABELS,
+        "n": int(len(obs[OBSERVABLE_KEYS[0]])),
+    })
+
+
+@app.post("/api/embed/{cache_key}")
+def embed_endpoint(
+    cache_key: str,
+    mode: str = "delay",      # delay | pca | direct
+    observable: str = "motion",  # for delay mode
+    tau: int | None = None,   # None = auto
+    m: int = 3,
+    keys: str = "",           # comma-separated for direct mode
+) -> JSONResponse:
+    """Reconstruction d'espace des phases via observables.
+
+    Modes :
+    - delay : Takens sur 1 observable scalaire (params: observable, tau, m)
+    - pca   : PCA sur 12 observables → m components (params: m)
+    - direct: pick K observables comme axes (params: keys comma-sep)
+    """
+    obs = _get_or_compute_observables(cache_key)
+
+    if mode == "delay":
+        if observable not in OBSERVABLE_KEYS:
+            raise HTTPException(status_code=400, detail=f"unknown observable {observable}")
+        series = obs[observable]
+        effective_tau = tau if tau is not None else auto_tau(series)
+        coords = delay_embed(series, m=m, tau=effective_tau)
+        return JSONResponse({
+            "mode": "delay",
+            "observable": observable,
+            "tau": int(effective_tau),
+            "m": int(m),
+            "coords": coords.tolist(),
+            "n": int(coords.shape[0]),
+        })
+
+    elif mode == "pca":
+        points, vals, explained = pca_embed(obs, OBSERVABLE_KEYS, m=m)
+        return JSONResponse({
+            "mode": "pca",
+            "m": int(m),
+            "coords": points.tolist(),
+            "eigenvalues": vals.tolist(),
+            "explained_variance": explained.tolist(),
+            "n": int(points.shape[0]),
+        })
+
+    elif mode == "direct":
+        key_list = [k.strip() for k in keys.split(",") if k.strip()]
+        if not key_list:
+            key_list = ["brightness", "motion", "entropy"]
+        for k in key_list:
+            if k not in OBSERVABLE_KEYS:
+                raise HTTPException(status_code=400, detail=f"unknown observable {k}")
+        coords = direct_embed(obs, key_list)
+        return JSONResponse({
+            "mode": "direct",
+            "keys": key_list,
+            "coords": coords.tolist(),
+            "n": int(coords.shape[0]),
+        })
+
+    raise HTTPException(status_code=400, detail=f"unknown mode {mode}")
+
+
+@app.post("/api/regime")
+def regime_endpoint(req: DynamicsRequest) -> JSONResponse:
+    """Verdict classifier depuis coords trajectoire.
+
+    Calcule dynamics analysis + classifie régime (fixed/noise/strange/cycle/torus).
+    """
+    coords = np.asarray(req.coords, dtype=np.float64)
+    from .dynamics import analyse_trajectory
+    analysis = analyse_trajectory(coords)
+    verdict = classify_from_analysis(analysis, embedding_dim=coords.shape[1])
+    return JSONResponse({
+        "verdict": verdict.to_dict(),
+        "metrics": {
+            "lyapunov": analysis["lyapunov"],
+            "correlation_dim": analysis["correlation_dim"],
+            "max_diag_ratio": analysis["max_diag_ratio"],
+            "convergence_rate": analysis["convergence_rate"],
+            "rqa_det": analysis["rqa"]["DET"],
+        },
+    })
+
+
+# ──────────────────────────────────────────────────────────────────
 # Phase 6 : systems zoo + experiment registry + v1 versioning
 # ──────────────────────────────────────────────────────────────────
 
