@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from .autotune import bayesian_search, random_search
 from .audio import encode_audio_aligned
 from .causal import causal_summary
+from .causal_advanced import causal_summary_advanced, pcmci_discovery, te_matrix_ksg
 from .clustering import cluster_latents, transition_matrix
 from .dna import compute_dna
 from .evolution import evolution_pipeline
@@ -34,6 +35,7 @@ from .registry import (
 )
 from .sfa import slow_feature_analysis
 from .wavelets import wavelet_per_dim
+from .benchmark import benchmark_summary
 from .sindy import fit_sindy
 from .spectral import dmd, power_spectrum
 from .systems import SYSTEMS, list_systems
@@ -113,6 +115,48 @@ def dynamics_endpoint(req: DynamicsRequest) -> JSONResponse:
     return JSONResponse(stats)
 
 
+@app.post("/api/dynamics_native/{cache_key}")
+def dynamics_native_endpoint(cache_key: str) -> JSONResponse:
+    """Dynamics computed DIRECTLY on high-dim latents (bypass UMAP).
+
+    Évite artefacts de projection : Lyapunov / corr_dim / RQA mesurés
+    dans l'espace original (e.g., 2048d ResNet50). Référence ground-truth
+    vs analyse sur projection 3D UMAP.
+    """
+    if cache_key not in _LATENTS_CACHE:
+        raise HTTPException(status_code=404, detail="No cached latents")
+    latents = _LATENTS_CACHE[cache_key]
+    t0 = time.time()
+    stats = analyse_trajectory(latents)
+    stats["compute_s"] = round(time.time() - t0, 3)
+    stats["space"] = f"native_{latents.shape[1]}d"
+    return JSONResponse(stats)
+
+
+@app.post("/api/topology_native/{cache_key}")
+def topology_native_endpoint(cache_key: str, max_dim: int = 1) -> JSONResponse:
+    """Persistent homology DIRECTLY on high-dim latents.
+
+    Bypasse projection 3D UMAP. PH dans espace original = topology
+    sans déformation. Plus coûteux mais ground-truth.
+    """
+    if cache_key not in _LATENTS_CACHE:
+        raise HTTPException(status_code=404, detail="No cached latents")
+    latents = _LATENTS_CACHE[cache_key]
+    if latents.shape[0] > 300:
+        # Subsample pour rester tractable en haute-dim
+        idx = np.linspace(0, latents.shape[0] - 1, 300).astype(int)
+        latents = latents[idx]
+    t0 = time.time()
+    global_ph = persistent_homology(latents, max_dim=max_dim, max_n=300)
+    out = {
+        "global": global_ph,
+        "space": f"native_{latents.shape[1]}d",
+        "compute_s": round(time.time() - t0, 3),
+    }
+    return JSONResponse(out)
+
+
 class SindyRequest(__import__("pydantic").BaseModel):
     coords: list[list[float]]
     dt: float = 1.0
@@ -153,12 +197,33 @@ def emergence_endpoint(req: DynamicsRequest) -> JSONResponse:
 
 @app.post("/api/causal")
 def causal_endpoint(req: DynamicsRequest) -> JSONResponse:
-    """Granger + TE + CCM sur trajectoire latente."""
+    """Granger + TE + CCM (basique). Pour PCMCI+ + KSG, utiliser /api/causal_advanced."""
     coords = np.asarray(req.coords, dtype=np.float32)
     if coords.ndim != 2 or coords.shape[0] < 20:
         raise HTTPException(status_code=400, detail="Need >= 20 points")
     t0 = time.time()
     out = causal_summary(coords, lag=2)
+    out["compute_s"] = round(time.time() - t0, 3)
+    return JSONResponse(out)
+
+
+@app.post("/api/causal_advanced")
+def causal_advanced_endpoint(req: DynamicsRequest, tau_max: int = 3, pc_alpha: float = 0.05) -> JSONResponse:
+    """PCMCI+ multi-variate causal discovery + KSG TE k-NN estimator.
+
+    Stronger than basic Granger : FDR control, non-linear options,
+    continuous estimator (no binning artifacts).
+    """
+    series = np.asarray(req.coords, dtype=np.float64)
+    if series.ndim != 2 or series.shape[0] < 30:
+        raise HTTPException(status_code=400, detail="Need >= 30 points")
+    if series.shape[1] > 8:
+        # Reduce to top 6 by variance for tractability
+        var = series.var(axis=0)
+        keep = np.argsort(var)[-6:]
+        series = series[:, keep]
+    t0 = time.time()
+    out = causal_summary_advanced(series, tau_max=tau_max, pc_alpha=pc_alpha)
     out["compute_s"] = round(time.time() - t0, 3)
     return JSONResponse(out)
 
@@ -655,6 +720,29 @@ def evolution_endpoint(cache_key: str, window: int = 24, stride: int = 8) -> JSO
     latents = _LATENTS_CACHE[cache_key]
     t0 = time.time()
     out = evolution_pipeline(latents, window=window, stride=stride)
+    out["compute_s"] = round(time.time() - t0, 3)
+    return JSONResponse(out)
+
+
+@app.post("/api/benchmark/{cache_key}")
+def benchmark_endpoint(cache_key: str, dt: float = 1.0) -> JSONResponse:
+    """Cross-tool benchmark : compare nos SINDy + DMD vs pysindy + scipy reference.
+
+    Valide correctness numérique + positionne performances.
+    Returns agreement metrics + speed comparison.
+    """
+    if cache_key not in _LATENTS_CACHE:
+        raise HTTPException(status_code=404, detail="No cached latents")
+    latents = _LATENTS_CACHE[cache_key]
+    if latents.shape[0] < 30:
+        raise HTTPException(status_code=400, detail="Need >= 30 points")
+    # Reduce dims for tractability if too high
+    if latents.shape[1] > 8:
+        var = latents.var(axis=0)
+        keep = np.argsort(var)[-3:]  # top-3 PC pour SINDy/DMD
+        latents = latents[:, keep]
+    t0 = time.time()
+    out = benchmark_summary(latents, dt=dt)
     out["compute_s"] = round(time.time() - t0, 3)
     return JSONResponse(out)
 
