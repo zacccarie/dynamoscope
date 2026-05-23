@@ -8,6 +8,7 @@ from backend.losses import (
     TopologyPreservationLoss,
     SFASlownessRegularizer,
     CausalSparsityLoss,
+    ClassicalAlignmentLoss,
 )
 
 
@@ -168,3 +169,61 @@ def test_combined_losses_sum():
     assert z.grad is not None
     assert torch.isfinite(z.grad).all()
     assert torch.isfinite(loss)
+
+
+# ---------- Classical Alignment ----------
+
+
+def test_classical_alignment_identity_zero():
+    """z_neural = z_classical → corr=1 → loss=0."""
+    z_ref = _smooth_traj(T=80, D=4).detach()
+    z = z_ref.clone().requires_grad_(True)
+    loss = ClassicalAlignmentLoss(mode="distance_corr")(z, z_ref)
+    assert loss.item() < 1e-4
+
+
+def test_classical_alignment_random_higher():
+    """Random vs structured ref → loss notable."""
+    z_ref = _smooth_traj(T=80, D=4).detach()
+    z = torch.randn_like(z_ref).requires_grad_(True)
+    loss = ClassicalAlignmentLoss()(z, z_ref)
+    assert loss.item() > 0.1
+
+
+def test_classical_alignment_different_T():
+    """T_neural != T_classical → utilise min(T)."""
+    z_n = torch.randn(60, 8, requires_grad=True)
+    z_c = torch.randn(50, 3)  # plus court (typical delay embed truncation)
+    loss = ClassicalAlignmentLoss()(z_n, z_c)
+    assert torch.isfinite(loss)
+
+
+def test_classical_alignment_gradient_flow():
+    z_ref = _smooth_traj(T=80, D=4).detach()
+    z = torch.randn_like(z_ref).requires_grad_(True)
+    loss = ClassicalAlignmentLoss()(z, z_ref)
+    loss.backward()
+    assert z.grad is not None
+    assert torch.isfinite(z.grad).all()
+    assert z.grad.abs().sum() > 0
+
+
+def test_classical_alignment_sliced_w():
+    z_ref = _smooth_traj(T=80, D=4).detach()
+    z = (z_ref + 0.1 * torch.randn_like(z_ref)).requires_grad_(True)
+    loss = ClassicalAlignmentLoss(mode="sliced_w", n_slices=4)(z, z_ref)
+    assert torch.isfinite(loss)
+    loss.backward()
+    assert z.grad is not None
+
+
+def test_compute_classical_target_helper():
+    """Helper produit tensor depuis frames numpy."""
+    import numpy as np
+    from backend.losses import compute_classical_target
+    rng = np.random.default_rng(0)
+    frames = rng.uniform(0, 1, (40, 32, 48, 3)).astype(np.float32)
+    target = compute_classical_target(frames, observable="motion", m=3)
+    assert target.dim() == 2
+    assert target.shape[1] == 3
+    assert target.shape[0] <= 40

@@ -26,10 +26,13 @@ from .lyapunov import LyapunovMatchingLoss
 from .topology import TopologyPreservationLoss
 from .slowness import SFASlownessRegularizer
 from .causal import CausalSparsityLoss
+from .classical_alignment import ClassicalAlignmentLoss, compute_classical_target
 
 __all__ = [
     "LyapunovMatchingLoss",
     "TopologyPreservationLoss",
     "SFASlownessRegularizer",
     "CausalSparsityLoss",
+    "ClassicalAlignmentLoss",
+    "compute_classical_target",
 ]
