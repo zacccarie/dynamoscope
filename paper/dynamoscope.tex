@@ -941,13 +941,42 @@ $\texttt{phase\_c + distill\_pcgrad}$ vs.\ $45.15 \pm 1.63$ for the
 naive sum, and significantly worse than $\texttt{phase\_c}$ alone
 (Welch $t=-2.53$, $p=0.012$, $n=5$ each). After projection the model
 loses statistical significance over the baseline ($p=0.063$).
-The incompatibility is therefore \emph{representational}, not
-optimization-level : the two objectives demand mutually exclusive
-latent geometries, and removing the conflicting components removes
-substantive learning signal. This is a strong negative result that
-the released artifact (\verb|results/pcgrad_distill.json|) and the
-experiment driver (\verb|experiments/pcgrad_distill.py|) make
-fully reproducible.
+
+\paragraph{(v) Channel separation does \emph{not} resolve it either.}
+A second canonical fix is to allocate disjoint latent sub-channels per
+objective. We split $z \in \mathbb{R}^{64}$ into
+$z_{\text{stat}} = z_{[:32]}$ (receiving Phase~C losses) and
+$z_{\text{geo}} = z_{[32:]}$ (receiving the alignment loss). DNA
+remains $44.87 \pm 1.90$, statistically tied with the naive sum
+($t=-0.22$, $p=0.82$), and borderline worse than $\texttt{phase\_c}$
+($t=-1.94$, $p=0.052$). The per-axis decomposition reveals the
+mechanism: separating channels reclaims small gains on chaos
+($+0.03$), topology ($+0.04$), and predictability ($+0.08$), but
+sacrifices \emph{structure} ($-0.34$), causality ($-0.09$), and
+spectral ($-0.11$), which Phase~C achieved precisely because it had
+full $64$-dimensional capacity. Halving the dimensionality available
+to each objective halves the effective expressivity, so each loss
+becomes weaker rather than better-isolated.
+
+\paragraph{Synthesis : three mechanisms contribute.}
+Combining the three falsified hypotheses, we conclude that the
+$\texttt{phase\_c}$ + $\texttt{distill}$ incompatibility cannot be
+attributed to a single failure mode. At least three mechanisms
+contribute: (a) representational --- the two objectives demand
+mutually exclusive latent geometries; (b) optimization --- gradient
+projection removes signal faster than it removes conflict; (c)
+capacity --- channel separation halves the dimensions each loss can
+shape. A genuine fix would require either a redesigned unified
+objective in which both regimes appear as limits, or a substantially
+larger model where capacity is no longer the binding constraint. We
+flag this as an important direction for future work but do not claim
+to have resolved it.
+
+\emph{Released artifacts}:
+\verb|results/pcgrad_distill.json|,
+\verb|results/channel_split.json|,
+\verb|experiments/pcgrad_distill.py|,
+\verb|experiments/channel_split.py|.
 
 \subsection{Honest Limitations}
 
