@@ -20,6 +20,7 @@ from .causal import causal_summary
 from .causal_advanced import causal_summary_advanced, pcmci_discovery, te_matrix_ksg
 from .clustering import cluster_latents, transition_matrix
 from .dna import compute_dna
+from .dna_validation import dna_ablation_study
 from .evolution import evolution_pipeline
 from .live import create_session, end_session, get_session
 from .prediction import counterfactual_rollouts, fit_predictor, rollout as rollout_fn
@@ -40,6 +41,7 @@ from .sindy import fit_sindy
 from .spectral import dmd, power_spectrum
 from .systems import SYSTEMS, list_systems
 from .topology import persistent_homology, sliding_window_ph
+from .vineyards import compute_vineyards
 
 ROOT = Path(__file__).resolve().parent.parent
 VIDEOS_DIR = ROOT / "videos"
@@ -131,6 +133,22 @@ def dynamics_native_endpoint(cache_key: str) -> JSONResponse:
     stats["compute_s"] = round(time.time() - t0, 3)
     stats["space"] = f"native_{latents.shape[1]}d"
     return JSONResponse(stats)
+
+
+@app.post("/api/vineyards")
+def vineyards_endpoint(req: DynamicsRequest, window: int = 80, stride: int = 20, max_dim: int = 1) -> JSONResponse:
+    """Vineyards : continuous birth-death tracking via sliding window PH + bipartite matching.
+
+    Cohen-Steiner et al. 2006. Plus rigoureux que sliding_window_ph (counts seulement) :
+    suit chaque persistence pair à travers les windows, identifie threads continus.
+    """
+    coords = np.asarray(req.coords, dtype=np.float64)
+    if coords.ndim != 2 or coords.shape[0] < 30:
+        raise HTTPException(status_code=400, detail="Need >= 30 points")
+    t0 = time.time()
+    out = compute_vineyards(coords, window=window, stride=stride, max_dim=max_dim)
+    out["compute_s"] = round(time.time() - t0, 3)
+    return JSONResponse(out)
 
 
 @app.post("/api/topology_native/{cache_key}")
@@ -721,6 +739,16 @@ def evolution_endpoint(cache_key: str, window: int = 24, stride: int = 8) -> JSO
     t0 = time.time()
     out = evolution_pipeline(latents, window=window, stride=stride)
     out["compute_s"] = round(time.time() - t0, 3)
+    return JSONResponse(out)
+
+
+@app.get("/api/dna_validation")
+def dna_validation_endpoint() -> JSONResponse:
+    """Ablation study sur DNA composite score : leave-one-axis-out +
+    permutation test vs random weights. Computes DNA sur 6 systèmes canoniques."""
+    t0 = time.time()
+    out = dna_ablation_study()
+    out["compute_s"] = round(time.time() - t0, 2)
     return JSONResponse(out)
 
 
