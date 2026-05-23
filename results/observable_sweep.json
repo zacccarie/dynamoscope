@@ -1,0 +1,107 @@
+{
+  "rows": [
+    {
+      "observable": "brightness",
+      "cp_frame": 290,
+      "mu_vis": 0.9536340852130325,
+      "lag_frames": 190,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "contrast",
+      "cp_frame": 210,
+      "mu_vis": 0.5526315789473684,
+      "lag_frames": 110,
+      "tau_effective": 1,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "meanR",
+      "cp_frame": 335,
+      "mu_vis": 1.1791979949874687,
+      "lag_frames": 235,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "meanG",
+      "cp_frame": 290,
+      "mu_vis": 0.9536340852130325,
+      "lag_frames": 190,
+      "tau_effective": 1,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "meanB",
+      "cp_frame": 290,
+      "mu_vis": 0.9536340852130325,
+      "lag_frames": 190,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "motion",
+      "cp_frame": 295,
+      "mu_vis": 0.9786967418546366,
+      "lag_frames": 195,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "flowX",
+      "cp_frame": 215,
+      "mu_vis": 0.5776942355889725,
+      "lag_frames": 115,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "flowY",
+      "cp_frame": 105,
+      "mu_vis": 0.02631578947368418,
+      "lag_frames": 5,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "entropy",
+      "cp_frame": 210,
+      "mu_vis": 0.5526315789473684,
+      "lag_frames": 110,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "edges",
+      "cp_frame": 210,
+      "mu_vis": 0.5526315789473684,
+      "lag_frames": 110,
+      "tau_effective": 1,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "centroidX",
+      "cp_frame": 285,
+      "mu_vis": 0.9285714285714284,
+      "lag_frames": 185,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    },
+    {
+      "observable": "centroidY",
+      "cp_frame": 225,
+      "mu_vis": 0.6278195488721803,
+      "lag_frames": 125,
+      "tau_effective": 2,
+      "compute_s": 1.4
+    }
+  ],
+  "spread": 230,
+  "gt_frame": 100,
+  "configs": {
+    "size": 128,
+    "window": 40,
+    "stride": 5
+  }
+}
