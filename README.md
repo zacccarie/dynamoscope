@@ -54,6 +54,8 @@ video / webcam / synthetic system
 
 ## Run
 
+### Web UI
+
 ```bash
 uv venv --python 3.13
 uv pip install -e .
@@ -61,6 +63,31 @@ uv pip install -e .
 ```
 
 Open http://127.0.0.1:8770
+
+### CLI (headless batch)
+
+```bash
+# Process 1 video, full analyses
+python -m backend.cli process video.mp4 --encoder dinov2_vits14 --analyses all --out result.json
+
+# Batch process folder
+python -m backend.cli batch ./videos --out-dir ./results --encoder resnet50
+
+# Just composite DNA score
+python -m backend.cli dna video.mp4
+
+# Compare 2 videos
+python -m backend.cli compare a.mp4 b.mp4
+
+# Synthetic system
+python -m backend.cli system lorenz --analyses all
+```
+
+### Tests
+
+```bash
+.venv/bin/python -m pytest tests/   # 50 tests, ~4s
+```
 
 ## Modules backend
 
