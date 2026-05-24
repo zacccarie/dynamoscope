@@ -1,0 +1,124 @@
+% Dynamodel — TikZ schema for paper inclusion
+% Usage : \input{docs/dynamodel/dynamodel.tex}
+% Requires : \usepackage{tikz} + libraries below in preamble
+%
+% Recommended preamble :
+%   \usepackage{tikz}
+%   \usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  node distance=8mm and 10mm,
+  block/.style={
+    rectangle, draw=black, fill=gray!5,
+    minimum width=24mm, minimum height=9mm,
+    rounded corners=2pt, align=center,
+    inner sep=2pt, font=\scriptsize
+  },
+  blockcore/.style={
+    block, fill=gray!10, draw=black, very thick,
+  },
+  blocksmooth/.style={
+    block, draw=teal!70!black, fill=teal!8,
+  },
+  blockperiodic/.style={
+    block, draw=olive!70!black, fill=olive!8,
+  },
+  blockchaotic/.style={
+    block, draw=red!70!black, fill=red!8,
+  },
+  blockloss/.style={
+    block, draw=orange!70!black, fill=orange!5,
+    font=\tiny,
+  },
+  blockdesc/.style={
+    block, fill=gray!3, draw=gray!50,
+    font=\tiny, minimum width=18mm,
+  },
+  arr/.style={->, >=Stealth, thick, draw=black!70},
+  arrgate/.style={->, >=Stealth, dashed, draw=red!60!black, thick},
+  arrloss/.style={->, >=Stealth, draw=orange!70!black},
+  group/.style={
+    rectangle, draw=gray!50, dashed,
+    rounded corners=4pt, inner sep=3mm,
+  },
+  label/.style={font=\tiny\itshape, gray!50!black},
+]
+
+% ===== Top row : input + encoder + SSM =====
+\node[block] (input) {INPUT\\\tiny frames or raw obs};
+\node[blockcore, right=of input] (enc) {PERCEPTUAL\\ENCODER\\\tiny MLP / DINOv2};
+\node[blockcore, right=of enc] (fast) {FAST GRU\\\tiny per-step};
+\node[blockcore, right=of fast] (slow) {SLOW GRU\\\tiny every k=4};
+
+% ===== Middle row : descriptors + router + regime =====
+\node[group, below=14mm of enc.south, anchor=north, minimum width=58mm] (descg) {};
+\node[label, above=0pt of descg.north] {DESCRIPTOR HEADS · $d_{\text{dyn}} \in \mathbb{R}^4$};
+\node[blockdesc] at ([yshift=-2mm]descg.center) (d1) {SLOWNESS};
+\node[blockdesc, left=2mm of d1] (d0) {ENERGY};
+\node[blockdesc, right=2mm of d1] (d2) {RECUR};
+\node[blockdesc, right=2mm of d2] (d3) {LYAP$^*$};
+
+\node[blockcore, draw=orange!70!black, right=14mm of descg] (router)
+  {REGIME\\ROUTER\\\tiny MLP+softmax};
+
+\node[group, right=10mm of router, minimum width=42mm] (regg) {};
+\node[label, above=0pt of regg.north] {$r \in \Delta^2$};
+\node[blocksmooth, scale=0.85] at ([xshift=-13mm]regg.center) (rs) {SMOOTH};
+\node[blockperiodic, scale=0.85] at (regg.center) (rp) {PERIODIC};
+\node[blockchaotic, scale=0.85] at ([xshift=13mm]regg.center) (rc) {CHAOTIC};
+
+% ===== Bottom row : mixture dynamics =====
+\node[group, below=14mm of router.south, anchor=north, minimum width=130mm] (dyng) {};
+\node[label, above=0pt of dyng.north] {REGIME MIXTURE DYNAMICS · $\hat z_{t+1} = \sum_k r_t^{(k)} \, \Phi_k(z_t)$};
+\node[blocksmooth] at ([xshift=-44mm,yshift=-2mm]dyng.center) (phis) {$\Phi_{\text{smooth}}$\\\tiny init 0.3 · contract};
+\node[blockperiodic] at ([yshift=-2mm]dyng.center) (phip) {$\Phi_{\text{periodic}}$\\\tiny init 0.6 · oscill};
+\node[blockchaotic] at ([xshift=44mm,yshift=-2mm]dyng.center) (phic) {$\Phi_{\text{chaotic}}$\\\tiny init 1.0 · diverge};
+
+\node[circle, draw=olive!70!black, very thick, minimum size=11mm, right=4mm of phic] (mix) {$\Sigma$};
+
+% ===== Decoder + losses =====
+\node[blockcore, below=18mm of phis.south, anchor=north] (dec) {DECODER\\\tiny D\_fast→d\_in};
+
+\node[group, right=4mm of dec, minimum width=120mm, fill=orange!3, draw=orange!50] (lossg) {};
+\node[label, above=0pt of lossg.north] {REGIME-CONDITIONAL LOSS · $\mathcal{L} = \mathcal{L}_{\text{rec}} + \mathcal{L}_{\text{dyn}} + r_{\text{p}}(\mathcal{L}_{\text{slow}} + \mathcal{L}_{\text{rec}}) + r_{\text{c}}\mathcal{L}_{\text{lyap}} + \beta\mathcal{L}_{\text{ent}} + \alpha\mathcal{L}_{\text{sup}}$};
+\node[blockloss] at ([xshift=-48mm,yshift=-2mm]lossg.center) (l1) {$\mathcal{L}_{\text{recon}}$};
+\node[blockloss, right=1mm of l1] (l2) {$\mathcal{L}_{\text{dyn}}$};
+\node[blockloss, right=1mm of l2] (l3) {$\mathcal{L}_{\text{slow}}$};
+\node[blockloss, right=1mm of l3] (l4) {$\mathcal{L}_{\text{recur}}$};
+\node[blockloss, right=1mm of l4] (l5) {$\mathcal{L}_{\text{lyap}}$};
+\node[blockloss, right=1mm of l5] (l6) {$\mathcal{L}_{\text{ent}}$};
+\node[blockloss, right=1mm of l6, draw=red!70!black, very thick] (l7) {$\mathcal{L}_{\text{sup}}$};
+
+% ===== Arrows =====
+\draw[arr] (input) -- (enc);
+\draw[arr] (enc) -- (fast);
+\draw[arr] (fast) -- (slow);
+\draw[arr] (slow) |- ([yshift=2mm]descg.north east);
+\draw[arr] (descg) -- (router);
+\draw[arr] (router) -- (regg);
+
+\draw[arr] (slow.south) ++(0,-2mm) |- ([xshift=2mm]phis.north);
+\draw[arr] (slow.south) ++(0,-2mm) |- ([xshift=2mm]phip.north);
+\draw[arr] (slow.south) ++(0,-2mm) |- ([xshift=2mm]phic.north);
+
+\draw[arrgate] (rs.south) |- (mix.west);
+\draw[arrgate] (rp.south) |- (mix.west);
+\draw[arrgate] (rc.south) |- (mix.west);
+\node[label, above=4mm of mix] (gateLbl) {gating weights};
+
+\draw[arr] (phis) -- (mix);
+\draw[arr] (phip) -- (mix);
+\draw[arr] (phic) -- (mix);
+
+\draw[arrloss] (enc.south) -- ++(0,-3mm) -| (dec.north);
+\draw[arrloss] (dec) -- (l1);
+\draw[arrloss] (mix.south) -- ++(0,-4mm) -| (l2.north);
+\draw[arrloss] (slow.south east) -- ++(3mm,-3mm) -| (l3.north);
+
+\end{tikzpicture}
+\caption{\textsc{Dynamodel} architecture (Phase 1 + Phase 2). State factorization $s_t = (z_{\text{fast}}, z_{\text{slow}}, d_{\text{dyn}}, r)$. Solid black arrows : forward signal. Dashed red : router gating into the mixture dynamics. Orange : connections feeding the loss components. Each transition module $\Phi_k$ has a regime-specific initialization scale (0.3, 0.6, 1.0) acting as a weak inductive bias. Loss weights are regime-conditional : $\mathcal{L}_{\text{slow}}$ and $\mathcal{L}_{\text{recur}}$ are gated by $r_{\text{periodic}}$, $\mathcal{L}_{\text{lyap}}$ by $r_{\text{chaotic}}$, $\mathcal{L}_{\text{sup}}$ provides supervised regime CE. Total parameters : 30K (Phase 1, $d_{\text{slow}}{=}32$) to 134K (Phase 2 on DINOv2 features, $d_{\text{slow}}{=}64$). Phase 2 final result : $28\times$ better one-step OOD prediction than matched-capacity flat-GRU baseline, router accuracy 0.84.}
+\label{fig:dynamodel}
+\end{figure}

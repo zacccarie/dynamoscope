@@ -1,0 +1,86 @@
+%%{init: {'theme':'dark', 'themeVariables': {'primaryColor':'#14141a','primaryBorderColor':'#d4d400','primaryTextColor':'#e8e8e8','lineColor':'#d4d400','secondaryColor':'#1a1a22','tertiaryColor':'#08080a'}}}%%
+flowchart TB
+
+  %% Input
+  INPUT["INPUT<br/>frames N×H×W×3 OR (T, d_in) traj"]:::input
+
+  %% Encoder branch
+  ENC["PERCEPTUAL ENCODER<br/>MLP Phase 1 / DINOv2-S Phase 2<br/>→ z_fast ∈ ℝ^D_fast"]:::core
+  DEC["DECODER<br/>2-layer MLP<br/>D_fast → 64 → d_in<br/>recon x̂_t"]:::core
+
+  %% SSM
+  FAST["FAST GRU<br/>per-step<br/>D_fast → D_fast"]:::core
+  SLOW["SLOW GRU<br/>every k=4 steps<br/>D_fast → D_slow"]:::core
+
+  %% Descriptors
+  subgraph DESC["DESCRIPTOR HEADS · d_dyn ∈ ℝ^4"]
+    direction LR
+    D1[SLOWNESS<br/>mean ‖Δz_std‖²]:::desc
+    D2[RECURRENCE<br/>σ((ε−d_ij)/τ)]:::desc
+    D3[LYAP PROXY<br/>var(ln d_ij)]:::desc
+    D4[VAR PROXY<br/>tr(cov z_slow)]:::desc
+  end
+
+  %% Router
+  ROUTER["REGIME ROUTER<br/>MLP(d_dyn) → softmax<br/>Linear 4→32→3 + softmax<br/>(entropy=0, sup_CE=5 Phase 2)"]:::router
+
+  %% Regime distribution
+  subgraph REG["REGIME r ∈ Δ²"]
+    direction LR
+    RS[(S<br/>smooth)]:::smooth
+    RP[(P<br/>periodic)]:::periodic
+    RC[(C<br/>chaotic)]:::chaotic
+  end
+
+  %% 3 transition modules
+  subgraph DYN["REGIME MIXTURE DYNAMICS"]
+    direction LR
+    PHI_S["Φ_SMOOTH<br/>2-layer MLP<br/>init=0.3<br/>contractive"]:::smooth
+    PHI_P["Φ_PERIODIC<br/>2-layer MLP<br/>init=0.6<br/>oscillatory"]:::periodic
+    PHI_C["Φ_CHAOTIC<br/>2-layer MLP<br/>init=1.0<br/>divergent"]:::chaotic
+  end
+
+  MIX(("Σ<br/>ẑ_{t+1} = Σ_k r_k · Φ_k(z_t)")):::mix
+
+  %% Losses
+  subgraph LOSS["REGIME-CONDITIONAL LOSS · L = L_recon + L_dyn + r_p·(L_slow+L_recur) + r_c·L_lyap + β·L_entropy + α·L_regime_sup"]
+    direction LR
+    L1[L_recon<br/>always]:::loss
+    L2[L_dyn 1-step<br/>always]:::loss
+    L3[L_slow<br/>w=r_smooth+r_periodic]:::loss
+    L4[L_recurrence<br/>w=r_periodic]:::loss
+    L5[L_lyap proxy<br/>w=r_chaotic]:::loss
+    L6[L_entropy<br/>w=β=0 P2]:::loss
+    L7[L_regime_sup<br/>CE r vs r*<br/>w=α=5 P2]:::loss_sup
+  end
+
+  %% Connections
+  INPUT --> ENC
+  ENC --> FAST
+  FAST --> SLOW
+  ENC --> DEC
+  SLOW --> DESC
+  DESC --> ROUTER
+  ROUTER --> REG
+  SLOW --> DYN
+  REG -.->|gating| MIX
+  DYN --> MIX
+  MIX --> L2
+  DEC --> L1
+  SLOW --> L3
+  SLOW --> L4
+  SLOW --> L5
+  ROUTER --> L6
+  ROUTER --> L7
+
+  %% Styles industrial-lab palette
+  classDef input fill:#1a1a22,stroke:#9a9a9e,color:#e8e8e8
+  classDef core fill:#14141a,stroke:#d4d400,color:#e8e8e8,stroke-width:2px
+  classDef desc fill:#1a1a22,stroke:#d4d40080,color:#e8e8e8
+  classDef router fill:#14141a,stroke:#ff7a00,color:#e8e8e8,stroke-width:2px
+  classDef smooth fill:#1a1a22,stroke:#5a8b7a,color:#5a8b7a
+  classDef periodic fill:#1a1a22,stroke:#d4d400,color:#d4d400
+  classDef chaotic fill:#1a1a22,stroke:#ff3838,color:#ff3838
+  classDef mix fill:#14141a,stroke:#d4d400,color:#d4d400,stroke-width:3px
+  classDef loss fill:#1a1a22,stroke:#ff7a00,color:#ff7a00
+  classDef loss_sup fill:#1a1a22,stroke:#ff3838,color:#ff3838,stroke-width:2px

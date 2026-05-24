@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1100" font-family="JetBrains Mono, monospace">
+  <!-- Industrial lab palette -->
+  <defs>
+    <style>
+      .bg { fill: #08080a; }
+      .panel { fill: #14141a; stroke: #d4d40044; stroke-width: 1; }
+      .panel-strong { fill: #1a1a22; stroke: #d4d4007a; stroke-width: 1.5; }
+      .accent { fill: #d4d400; }
+      .warn { fill: #ff3838; }
+      .signal { fill: #ff7a00; }
+      .teal { fill: #5a8b7a; }
+      .fg { fill: #e8e8e8; }
+      .mute { fill: #9a9a9e; }
+      .dim { fill: #5e5e64; }
+      .arrow { fill: none; stroke: #d4d4007a; stroke-width: 1.5; marker-end: url(#arrowhead); }
+      .arrow-warn { fill: none; stroke: #ff383866; stroke-width: 1.2; stroke-dasharray: 3 3; marker-end: url(#arrowhead-warn); }
+      .arrow-signal { fill: none; stroke: #ff7a0066; stroke-width: 1.2; marker-end: url(#arrowhead-signal); }
+      .arrow-teal { fill: none; stroke: #5a8b7a99; stroke-width: 1.2; marker-end: url(#arrowhead-teal); }
+      text { font-size: 12px; }
+      .title { font-size: 22px; font-weight: 700; }
+      .subtitle { font-size: 11px; font-weight: 500; letter-spacing: 0.18em; }
+      .small { font-size: 10px; }
+      .tiny { font-size: 9px; }
+      .formula { font-family: serif; font-style: italic; font-size: 11px; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" fill="#d4d400">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+    <marker id="arrowhead-warn" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" fill="#ff3838">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+    <marker id="arrowhead-signal" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" fill="#ff7a00">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+    <marker id="arrowhead-teal" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" fill="#5a8b7a">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="1100" />
+
+  <!-- Title -->
+  <text x="30" y="40" class="title accent">DYNAMODEL</text>
+  <text x="30" y="62" class="subtitle mute">REGIME-CONDITIONAL MIXTURE-OF-EXPERTS WORLD MODEL · STATE FACTORIZATION s_t = (z_fast, z_slow, d_dyn, r)</text>
+  <text x="30" y="80" class="small dim">PHASE 1 (synth, 30K params) · PHASE 2 (video DINOv2, 134K params) · 28× better OOD than matched flat baseline · paper §10</text>
+
+  <!-- INPUT LAYER -->
+  <g transform="translate(40, 130)">
+    <rect class="panel" width="200" height="100" rx="6" />
+    <text x="100" y="22" text-anchor="middle" class="accent subtitle">INPUT</text>
+    <text x="100" y="46" text-anchor="middle" class="fg small">Video frames OR raw obs</text>
+    <text x="100" y="62" text-anchor="middle" class="mute tiny">(N, H, W, 3) RGB</text>
+    <text x="100" y="76" text-anchor="middle" class="mute tiny">OR (T, d_in) trajectory</text>
+    <text x="100" y="92" text-anchor="middle" class="dim tiny">Phase 1 : raw obs · Phase 2 : video</text>
+  </g>
+
+  <!-- PERCEPTUAL ENCODER -->
+  <g transform="translate(300, 130)">
+    <rect class="panel-strong" width="240" height="100" rx="6" />
+    <text x="120" y="22" text-anchor="middle" class="accent subtitle">PERCEPTUAL ENCODER</text>
+    <text x="120" y="46" text-anchor="middle" class="fg small">MLP (Phase 1)</text>
+    <text x="120" y="62" text-anchor="middle" class="fg small">OR frozen DINOv2-S (Phase 2)</text>
+    <text x="120" y="80" text-anchor="middle" class="mute tiny">→ z_fast ∈ ℝ^D_fast (D_fast = 32 or 64)</text>
+    <text x="120" y="94" text-anchor="middle" class="dim tiny">f_enc(x_t)</text>
+  </g>
+
+  <!-- FAST GRU -->
+  <g transform="translate(600, 130)">
+    <rect class="panel-strong" width="200" height="100" rx="6" />
+    <text x="100" y="22" text-anchor="middle" class="accent subtitle">FAST GRU</text>
+    <text x="100" y="46" text-anchor="middle" class="fg small">per-step update</text>
+    <text x="100" y="62" text-anchor="middle" class="fg small">GRUCell(D_fast, D_fast)</text>
+    <text x="100" y="80" text-anchor="middle" class="mute tiny">h_fast_t = GRU(z_fast_t, h_fast_{t-1})</text>
+    <text x="100" y="94" text-anchor="middle" class="dim tiny">motion / texture / local</text>
+  </g>
+
+  <!-- SLOW GRU -->
+  <g transform="translate(860, 130)">
+    <rect class="panel-strong" width="220" height="100" rx="6" />
+    <text x="110" y="22" text-anchor="middle" class="accent subtitle">SLOW GRU</text>
+    <text x="110" y="46" text-anchor="middle" class="fg small">every k=4 steps update</text>
+    <text x="110" y="62" text-anchor="middle" class="fg small">GRUCell(D_fast, D_slow)</text>
+    <text x="110" y="80" text-anchor="middle" class="mute tiny">h_slow ← GRU(mean(h_fast_window), h_slow)</text>
+    <text x="110" y="94" text-anchor="middle" class="dim tiny">regime / structure / global</text>
+  </g>
+
+  <!-- z_slow output line -->
+  <text x="1110" y="180" class="accent small">z_slow ∈ ℝ^{T_s × D_slow}</text>
+
+  <!-- DESCRIPTOR HEADS -->
+  <g transform="translate(40, 290)">
+    <rect class="panel" width="500" height="180" rx="6" />
+    <text x="250" y="22" text-anchor="middle" class="accent subtitle">DESCRIPTOR HEADS</text>
+    <text x="250" y="40" text-anchor="middle" class="mute tiny">4 lightweight differentiable diagnostics computed from z_slow window</text>
+
+    <!-- 4 boxes -->
+    <g transform="translate(20, 60)">
+      <rect class="panel-strong" width="105" height="100" rx="4" />
+      <text x="52" y="20" text-anchor="middle" class="accent tiny">SLOWNESS</text>
+      <text x="52" y="40" text-anchor="middle" class="fg tiny">mean ‖Δz_std‖²</text>
+      <text x="52" y="58" text-anchor="middle" class="mute tiny">low = slow</text>
+      <text x="52" y="78" text-anchor="middle" class="dim tiny">SFA-inspired</text>
+      <text x="52" y="92" text-anchor="middle" class="dim tiny">[Wiskott '02]</text>
+    </g>
+
+    <g transform="translate(135, 60)">
+      <rect class="panel-strong" width="105" height="100" rx="4" />
+      <text x="52" y="20" text-anchor="middle" class="accent tiny">RECURRENCE</text>
+      <text x="52" y="40" text-anchor="middle" class="fg tiny">σ((ε−d_ij)/τ)</text>
+      <text x="52" y="58" text-anchor="middle" class="mute tiny">soft RQA</text>
+      <text x="52" y="78" text-anchor="middle" class="dim tiny">Theiler win</text>
+      <text x="52" y="92" text-anchor="middle" class="dim tiny">[Marwan]</text>
+    </g>
+
+    <g transform="translate(250, 60)">
+      <rect class="panel-strong" width="105" height="100" rx="4" />
+      <text x="52" y="20" text-anchor="middle" class="accent tiny">LYAP PROXY</text>
+      <text x="52" y="40" text-anchor="middle" class="fg tiny">var(ln d_ij)</text>
+      <text x="52" y="58" text-anchor="middle" class="mute tiny">divergence</text>
+      <text x="52" y="78" text-anchor="middle" class="dim tiny">Rosenstein-lite</text>
+      <text x="52" y="92" text-anchor="middle" class="dim tiny">[1993]</text>
+    </g>
+
+    <g transform="translate(365, 60)">
+      <rect class="panel-strong" width="115" height="100" rx="4" />
+      <text x="57" y="20" text-anchor="middle" class="accent tiny">VAR PROXY</text>
+      <text x="57" y="40" text-anchor="middle" class="fg tiny">tr(cov(z_slow))</text>
+      <text x="57" y="58" text-anchor="middle" class="mute tiny">latent energy</text>
+      <text x="57" y="78" text-anchor="middle" class="dim tiny">stability</text>
+      <text x="57" y="92" text-anchor="middle" class="dim tiny">signature</text>
+    </g>
+  </g>
+
+  <!-- d_dyn output -->
+  <text x="540" y="350" class="accent small">d_dyn ∈ ℝ^4</text>
+
+  <!-- REGIME ROUTER -->
+  <g transform="translate(600, 290)">
+    <rect class="panel-strong" width="280" height="180" rx="6" />
+    <text x="140" y="22" text-anchor="middle" class="accent subtitle">REGIME ROUTER</text>
+    <text x="140" y="42" text-anchor="middle" class="mute tiny">MLP(d_dyn) → softmax Δ²</text>
+
+    <!-- Internal architecture -->
+    <g transform="translate(20, 56)">
+      <rect class="panel" width="240" height="32" rx="3" />
+      <text x="120" y="20" text-anchor="middle" class="fg tiny">Linear(4 → 32) + SiLU</text>
+    </g>
+    <g transform="translate(20, 92)">
+      <rect class="panel" width="240" height="32" rx="3" />
+      <text x="120" y="20" text-anchor="middle" class="fg tiny">Linear(32 → 3)</text>
+    </g>
+    <g transform="translate(20, 128)">
+      <rect class="panel" width="240" height="36" rx="3" />
+      <text x="120" y="22" text-anchor="middle" class="fg tiny">softmax(logits / T)</text>
+    </g>
+
+    <!-- Hyperparameter note -->
+    <text x="140" y="178" text-anchor="middle" class="warn tiny">entropy_reg = 0 + sup_CE = 5 (Phase 2 fix)</text>
+  </g>
+
+  <!-- r output -->
+  <text x="880" y="350" class="accent small">r ∈ Δ²</text>
+
+  <!-- REGIME OUTPUTS -->
+  <g transform="translate(940, 290)">
+    <rect class="panel" width="420" height="180" rx="6" />
+    <text x="210" y="22" text-anchor="middle" class="accent subtitle">REGIME DISTRIBUTION</text>
+
+    <!-- 3 regime cells -->
+    <g transform="translate(20, 50)">
+      <rect class="panel-strong" width="120" height="110" rx="4" />
+      <circle cx="60" cy="30" r="14" fill="#5a8b7a" />
+      <text x="60" y="34" text-anchor="middle" class="fg" font-weight="700">S</text>
+      <text x="60" y="60" text-anchor="middle" class="accent tiny">SMOOTH</text>
+      <text x="60" y="78" text-anchor="middle" class="mute tiny">r_smooth</text>
+      <text x="60" y="94" text-anchor="middle" class="dim tiny">point fixe</text>
+    </g>
+
+    <g transform="translate(150, 50)">
+      <rect class="panel-strong" width="120" height="110" rx="4" />
+      <circle cx="60" cy="30" r="14" fill="#d4d400" />
+      <text x="60" y="34" text-anchor="middle" class="bg" font-weight="700">P</text>
+      <text x="60" y="60" text-anchor="middle" class="accent tiny">PERIODIC</text>
+      <text x="60" y="78" text-anchor="middle" class="mute tiny">r_periodic</text>
+      <text x="60" y="94" text-anchor="middle" class="dim tiny">cycle limite</text>
+    </g>
+
+    <g transform="translate(280, 50)">
+      <rect class="panel-strong" width="120" height="110" rx="4" />
+      <circle cx="60" cy="30" r="14" fill="#ff3838" />
+      <text x="60" y="34" text-anchor="middle" class="fg" font-weight="700">C</text>
+      <text x="60" y="60" text-anchor="middle" class="accent tiny">CHAOTIC</text>
+      <text x="60" y="78" text-anchor="middle" class="mute tiny">r_chaotic</text>
+      <text x="60" y="94" text-anchor="middle" class="dim tiny">attracteur étrange</text>
+    </g>
+  </g>
+
+  <!-- REGIME MIXTURE DYNAMICS -->
+  <g transform="translate(40, 530)">
+    <rect class="panel" width="1320" height="220" rx="6" />
+    <text x="660" y="22" text-anchor="middle" class="accent subtitle">REGIME MIXTURE DYNAMICS</text>
+    <text x="660" y="42" text-anchor="middle" class="mute tiny">ẑ_slow_{t+1} = Σ_k r_t^(k) · Φ_k(z_slow_t)</text>
+
+    <!-- 3 transition modules -->
+    <g transform="translate(80, 60)">
+      <rect class="panel-strong" width="280" height="140" rx="4" stroke="#5a8b7a" />
+      <text x="140" y="22" text-anchor="middle" class="teal" font-weight="600">Φ_SMOOTH</text>
+      <text x="140" y="42" text-anchor="middle" class="mute tiny">2-layer residual MLP</text>
+      <text x="140" y="58" text-anchor="middle" class="fg tiny">D_slow → 64 → D_slow</text>
+      <text x="140" y="78" text-anchor="middle" class="mute tiny">init scale = 0.3</text>
+      <text x="140" y="98" text-anchor="middle" class="dim tiny">contractive bias</text>
+      <text x="140" y="114" text-anchor="middle" class="dim tiny">ideal for damped / fixed-point</text>
+      <text x="140" y="130" text-anchor="middle" class="teal small">Φ(z) = z + Δ_smooth(z)</text>
+    </g>
+
+    <g transform="translate(420, 60)">
+      <rect class="panel-strong" width="280" height="140" rx="4" stroke="#d4d400" />
+      <text x="140" y="22" text-anchor="middle" class="accent" font-weight="600">Φ_PERIODIC</text>
+      <text x="140" y="42" text-anchor="middle" class="mute tiny">2-layer residual MLP</text>
+      <text x="140" y="58" text-anchor="middle" class="fg tiny">D_slow → 64 → D_slow</text>
+      <text x="140" y="78" text-anchor="middle" class="mute tiny">init scale = 0.6</text>
+      <text x="140" y="98" text-anchor="middle" class="dim tiny">oscillatory bias</text>
+      <text x="140" y="114" text-anchor="middle" class="dim tiny">cycle / torus</text>
+      <text x="140" y="130" text-anchor="middle" class="accent small">Φ(z) = z + Δ_periodic(z)</text>
+    </g>
+
+    <g transform="translate(760, 60)">
+      <rect class="panel-strong" width="280" height="140" rx="4" stroke="#ff3838" />
+      <text x="140" y="22" text-anchor="middle" class="warn" font-weight="600">Φ_CHAOTIC</text>
+      <text x="140" y="42" text-anchor="middle" class="mute tiny">2-layer residual MLP</text>
+      <text x="140" y="58" text-anchor="middle" class="fg tiny">D_slow → 64 → D_slow</text>
+      <text x="140" y="78" text-anchor="middle" class="mute tiny">init scale = 1.0</text>
+      <text x="140" y="98" text-anchor="middle" class="dim tiny">divergence-tolerant</text>
+      <text x="140" y="114" text-anchor="middle" class="dim tiny">strange attractors</text>
+      <text x="140" y="130" text-anchor="middle" class="warn small">Φ(z) = z + Δ_chaotic(z)</text>
+    </g>
+
+    <!-- Mixture symbol -->
+    <g transform="translate(1080, 80)">
+      <circle cx="80" cy="50" r="38" class="panel-strong" stroke="#d4d400" stroke-width="2" />
+      <text x="80" y="48" text-anchor="middle" class="accent" font-size="18" font-weight="700">Σ</text>
+      <text x="80" y="68" text-anchor="middle" class="mute tiny">weighted</text>
+      <text x="80" y="118" text-anchor="middle" class="accent small">ẑ_slow_{t+1}</text>
+    </g>
+  </g>
+
+  <!-- DECODER -->
+  <g transform="translate(40, 800)">
+    <rect class="panel" width="220" height="100" rx="6" />
+    <text x="110" y="22" text-anchor="middle" class="accent subtitle">DECODER (recon)</text>
+    <text x="110" y="48" text-anchor="middle" class="fg small">2-layer MLP</text>
+    <text x="110" y="66" text-anchor="middle" class="mute tiny">D_fast → 64 → d_in</text>
+    <text x="110" y="84" text-anchor="middle" class="dim tiny">x̂_t = Dec(z_fast_t)</text>
+  </g>
+
+  <!-- LOSS BLOCK -->
+  <g transform="translate(300, 800)">
+    <rect class="panel-strong" width="1060" height="230" rx="6" stroke="#ff7a00" />
+    <text x="530" y="22" text-anchor="middle" class="signal subtitle">REGIME-CONDITIONAL LOSS</text>
+    <text x="530" y="42" text-anchor="middle" class="mute tiny">
+      L = L_recon + L_dyn + r_periodic·(L_slow + L_recur) + r_chaotic·L_lyap + β·L_entropy + α·L_regime_sup
+    </text>
+
+    <!-- 7 loss boxes -->
+    <g transform="translate(20, 60)">
+      <rect class="panel" width="140" height="78" rx="3" />
+      <text x="70" y="18" text-anchor="middle" class="signal tiny">L_recon</text>
+      <text x="70" y="36" text-anchor="middle" class="fg tiny">‖x̂ − x‖²</text>
+      <text x="70" y="54" text-anchor="middle" class="dim tiny">weight = 1.0</text>
+      <text x="70" y="68" text-anchor="middle" class="dim tiny">always</text>
+    </g>
+
+    <g transform="translate(170, 60)">
+      <rect class="panel" width="140" height="78" rx="3" />
+      <text x="70" y="18" text-anchor="middle" class="signal tiny">L_dyn (1-step)</text>
+      <text x="70" y="36" text-anchor="middle" class="fg tiny">‖ẑ_{t+1} − z_{t+1}‖²</text>
+      <text x="70" y="54" text-anchor="middle" class="dim tiny">weight = 1.0</text>
+      <text x="70" y="68" text-anchor="middle" class="dim tiny">always</text>
+    </g>
+
+    <g transform="translate(320, 60)">
+      <rect class="panel" width="140" height="78" rx="3" />
+      <text x="70" y="18" text-anchor="middle" class="signal tiny">L_slow</text>
+      <text x="70" y="36" text-anchor="middle" class="fg tiny">mean ‖Δz̃‖²</text>
+      <text x="70" y="54" text-anchor="middle" class="dim tiny">w = r_periodic</text>
+      <text x="70" y="68" text-anchor="middle" class="dim tiny">+ r_smooth</text>
+    </g>
+
+    <g transform="translate(470, 60)">
+      <rect class="panel" width="140" height="78" rx="3" />
+      <text x="70" y="18" text-anchor="middle" class="signal tiny">L_recurrence</text>
+      <text x="70" y="36" text-anchor="middle" class="fg tiny">(DET − DET*)²</text>
+      <text x="70" y="54" text-anchor="middle" class="dim tiny">w = r_periodic</text>
+      <text x="70" y="68" text-anchor="middle" class="dim tiny">soft R matrix</text>
+    </g>
+
+    <g transform="translate(620, 60)">
+      <rect class="panel" width="140" height="78" rx="3" />
+      <text x="70" y="18" text-anchor="middle" class="signal tiny">L_lyap proxy</text>
+      <text x="70" y="36" text-anchor="middle" class="fg tiny">(log_growth − μ*)²</text>
+      <text x="70" y="54" text-anchor="middle" class="dim tiny">w = r_chaotic</text>
+      <text x="70" y="68" text-anchor="middle" class="dim tiny">nearest-pair growth</text>
+    </g>
+
+    <g transform="translate(770, 60)">
+      <rect class="panel" width="140" height="78" rx="3" />
+      <text x="70" y="18" text-anchor="middle" class="signal tiny">L_entropy</text>
+      <text x="70" y="36" text-anchor="middle" class="fg tiny">(H(r) − H*)²</text>
+      <text x="70" y="54" text-anchor="middle" class="dim tiny">w = β = 0 (P2)</text>
+      <text x="70" y="68" text-anchor="middle" class="dim tiny">anti-collapse</text>
+    </g>
+
+    <g transform="translate(920, 60)">
+      <rect class="panel" width="120" height="78" rx="3" stroke="#ff7a00" />
+      <text x="60" y="18" text-anchor="middle" class="signal tiny">L_regime_sup</text>
+      <text x="60" y="36" text-anchor="middle" class="fg tiny">CE(r, r*)</text>
+      <text x="60" y="54" text-anchor="middle" class="dim tiny">w = α = 5 (P2)</text>
+      <text x="60" y="68" text-anchor="middle" class="dim tiny">supervised</text>
+    </g>
+
+    <!-- 3-stage scheduling -->
+    <g transform="translate(20, 150)">
+      <text x="0" y="14" class="accent tiny">3-STAGE TRAINING :</text>
+      <text x="0" y="32" class="fg tiny">Stage 1 (30%)  : L_recon + L_dyn only</text>
+      <text x="0" y="48" class="fg tiny">Stage 2 (30%)  : + L_slow, L_recur, L_lyap (uniform weights)</text>
+      <text x="0" y="64" class="fg tiny">Stage 3 (40%)  : + regime-conditional weighting + L_regime_sup</text>
+    </g>
+  </g>
+
+  <!-- ARROWS -->
+  <!-- Input → Encoder -->
+  <path class="arrow" d="M 240 180 L 300 180" />
+  <!-- Encoder → Fast GRU -->
+  <path class="arrow" d="M 540 180 L 600 180" />
+  <!-- Fast → Slow -->
+  <path class="arrow" d="M 800 180 L 860 180" />
+  <!-- Slow → Descriptors -->
+  <path class="arrow" d="M 970 230 L 970 270 L 290 270 L 290 290" />
+  <!-- Descriptors → Router -->
+  <path class="arrow" d="M 540 380 L 600 380" />
+  <!-- Router → Regime distribution -->
+  <path class="arrow" d="M 880 380 L 940 380" />
+  <!-- Slow → Φ modules (via mixture block) -->
+  <path class="arrow" d="M 970 230 L 970 510 L 220 510 L 220 590" />
+  <path class="arrow" d="M 220 510 L 560 510 L 560 590" />
+  <path class="arrow" d="M 560 510 L 900 510 L 900 590" />
+  <!-- Router → Σ (mixture) -->
+  <path class="arrow-warn" d="M 1180 470 L 1180 540 L 1160 590" />
+  <text x="1190" y="500" class="warn tiny">gating weights</text>
+  <!-- Φ outputs → Σ -->
+  <path class="arrow-teal" d="M 360 660 L 1080 660 L 1130 660" />
+  <path class="arrow" d="M 700 660 L 1130 660" />
+  <path class="arrow-warn" d="M 1040 660 L 1130 660" />
+  <!-- Σ → loss (dyn) -->
+  <path class="arrow-signal" d="M 1160 760 L 1160 800 L 240 800 L 240 838" />
+  <!-- Encoder → Decoder -->
+  <path class="arrow-signal" d="M 420 230 L 420 770 L 150 770 L 150 800" />
+  <!-- Decoder → loss (recon) -->
+  <path class="arrow-signal" d="M 260 838 L 320 838" />
+
+  <!-- Legend bottom-left -->
+  <g transform="translate(40, 1050)">
+    <text x="0" y="0" class="dim tiny">LEGEND :</text>
+    <line x1="60" y1="-4" x2="90" y2="-4" stroke="#d4d400" stroke-width="1.5" />
+    <text x="95" y="0" class="dim tiny">forward signal</text>
+    <line x1="190" y1="-4" x2="220" y2="-4" stroke="#ff3838" stroke-width="1.2" stroke-dasharray="3 3" />
+    <text x="225" y="0" class="dim tiny">router gating</text>
+    <line x1="310" y1="-4" x2="340" y2="-4" stroke="#ff7a00" stroke-width="1.2" />
+    <text x="345" y="0" class="dim tiny">loss connections</text>
+    <line x1="460" y1="-4" x2="490" y2="-4" stroke="#5a8b7a" stroke-width="1.2" />
+    <text x="495" y="0" class="dim tiny">smooth-regime path</text>
+  </g>
+</svg>
