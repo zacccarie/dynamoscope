@@ -140,28 +140,46 @@ def run_one_seed(seed: int, n_per_regime=20, T=128, n_epochs=40):
     train_ds, eval_ds = split_train_eval(ds, train_ratio=0.7, seed=seed)
     print(f"  train={len(train_ds)} eval={len(eval_ds)}")
 
-    # A. RegimeWorldModel
+    # A. RegimeWorldModel — unsupervised (no regime labels in training)
     torch.manual_seed(seed); np.random.seed(seed)
     rwm = RegimeWorldModel(d_in=3, d_fast=32, d_slow=32, slow_stride=4)
-    cfg = TrainConfig(n_epochs=n_epochs, lr=3e-4, device="cpu",
-                       w_dyn=1.0, w_slow=1.0, w_recur=0.5, w_lyap=0.3,
-                       w_entropy=0.1)
-    print(f"  training RegimeWorldModel ({rwm.count_params()} params)...")
+    cfg_u = TrainConfig(n_epochs=n_epochs, lr=3e-4, device="cpu",
+                        w_dyn=1.0, w_slow=1.0, w_recur=0.5, w_lyap=0.3,
+                        w_entropy=0.1, w_regime_sup=0.0)
+    print(f"  training RWM unsupervised ({rwm.count_params()} params)...")
     ts = time.time()
-    train(rwm, train_ds, cfg, verbose=False)
+    train(rwm, train_ds, cfg_u, verbose=False)
     t_rwm = time.time() - ts
 
     rwm_eval_out = encode_eval(rwm, eval_ds)
     rwm_train_out = encode_eval(rwm, train_ds)
 
-    # Probe : linear over z_slow_pooled
     rwm_auc, rwm_acc = linear_probe_auroc(
         rwm_train_out["z_slow_pooled"], rwm_train_out["regime_true_idx"],
         rwm_eval_out["z_slow_pooled"], rwm_eval_out["regime_true_idx"],
     )
-    # Direct regime from router
     r_pred = rwm_eval_out["r"].argmax(axis=1)
     direct_acc = float(np.mean(r_pred == rwm_eval_out["regime_true_idx"]))
+
+    # A2. RegimeWorldModel — semi-supervised (w_regime_sup > 0)
+    torch.manual_seed(seed); np.random.seed(seed)
+    rwm_s = RegimeWorldModel(d_in=3, d_fast=32, d_slow=32, slow_stride=4)
+    cfg_s = TrainConfig(n_epochs=n_epochs, lr=3e-4, device="cpu",
+                        w_dyn=1.0, w_slow=1.0, w_recur=0.5, w_lyap=0.3,
+                        w_entropy=0.1, w_regime_sup=1.0)
+    print(f"  training RWM supervised ...")
+    ts = time.time()
+    train(rwm_s, train_ds, cfg_s, verbose=False)
+    t_rwm_s = time.time() - ts
+
+    rwm_s_eval = encode_eval(rwm_s, eval_ds)
+    rwm_s_train = encode_eval(rwm_s, train_ds)
+    rwm_s_auc, rwm_s_acc = linear_probe_auroc(
+        rwm_s_train["z_slow_pooled"], rwm_s_train["regime_true_idx"],
+        rwm_s_eval["z_slow_pooled"], rwm_s_eval["regime_true_idx"],
+    )
+    r_pred_s = rwm_s_eval["r"].argmax(axis=1)
+    direct_acc_s = float(np.mean(r_pred_s == rwm_s_eval["regime_true_idx"]))
 
     # B. FlatBaseline
     torch.manual_seed(seed); np.random.seed(seed)
@@ -177,18 +195,20 @@ def run_one_seed(seed: int, n_per_regime=20, T=128, n_epochs=40):
     base_auc, base_acc = linear_probe_auroc(Z_train_b, y_train_b,
                                               Z_eval_b, y_eval_b)
 
-    print(f"  RWM probe AUROC={rwm_auc:.3f} acc={rwm_acc:.3f}  "
-          f"direct regime acc={direct_acc:.3f}  ({t_rwm:.1f}s)")
-    print(f"  BASE probe AUROC={base_auc:.3f} acc={base_acc:.3f}  "
+    print(f"  RWM-unsup  probe AUROC={rwm_auc:.3f} acc={rwm_acc:.3f}  "
+          f"router acc={direct_acc:.3f}  ({t_rwm:.1f}s)")
+    print(f"  RWM-sup    probe AUROC={rwm_s_auc:.3f} acc={rwm_s_acc:.3f}  "
+          f"router acc={direct_acc_s:.3f}  ({t_rwm_s:.1f}s)")
+    print(f"  BASE       probe AUROC={base_auc:.3f} acc={base_acc:.3f}  "
           f"({t_base:.1f}s)")
 
     return {
         "seed": seed,
-        "rwm_probe_auroc": rwm_auc, "rwm_probe_acc": rwm_acc,
-        "rwm_direct_regime_acc": direct_acc,
+        "rwm_unsup_probe_auroc": rwm_auc, "rwm_unsup_router_acc": direct_acc,
+        "rwm_sup_probe_auroc": rwm_s_auc, "rwm_sup_router_acc": direct_acc_s,
         "base_probe_auroc": base_auc, "base_probe_acc": base_acc,
-        "rwm_train_time_s": t_rwm,
-        "base_train_time_s": t_base,
+        "rwm_unsup_time_s": t_rwm, "rwm_sup_time_s": t_rwm_s,
+        "base_time_s": t_base,
     }
 
 
@@ -209,19 +229,19 @@ def main():
         print("no rows")
         return
 
-    rwm_auc = [r["rwm_probe_auroc"] for r in rows]
+    rwm_u_auc = [r["rwm_unsup_probe_auroc"] for r in rows]
+    rwm_s_auc = [r["rwm_sup_probe_auroc"] for r in rows]
     base_auc = [r["base_probe_auroc"] for r in rows]
-    rwm_direct = [r["rwm_direct_regime_acc"] for r in rows]
+    rwm_u_router = [r["rwm_unsup_router_acc"] for r in rows]
+    rwm_s_router = [r["rwm_sup_router_acc"] for r in rows]
+
     print("\n" + "=" * 75)
     print("AGGREGATE (mean ± std)")
     print("=" * 75)
-    print(f"  RegimeWorldModel probe AUROC  : {np.mean(rwm_auc):.3f} ± {np.std(rwm_auc):.3f}")
-    print(f"  Flat Baseline probe AUROC     : {np.mean(base_auc):.3f} ± {np.std(base_auc):.3f}")
-    print(f"  RegimeWorldModel direct regime: {np.mean(rwm_direct):.3f} ± {np.std(rwm_direct):.3f}")
-    delta = np.mean(rwm_auc) - np.mean(base_auc)
-    print(f"\n  Δ AUROC (RWM - Base) = {delta:+.3f}")
+    print(f"  RWM unsupervised  AUROC : {np.mean(rwm_u_auc):.3f} ± {np.std(rwm_u_auc):.3f}   router_acc : {np.mean(rwm_u_router):.3f} ± {np.std(rwm_u_router):.3f}")
+    print(f"  RWM supervised    AUROC : {np.mean(rwm_s_auc):.3f} ± {np.std(rwm_s_auc):.3f}   router_acc : {np.mean(rwm_s_router):.3f} ± {np.std(rwm_s_router):.3f}")
+    print(f"  Flat Baseline     AUROC : {np.mean(base_auc):.3f} ± {np.std(base_auc):.3f}")
 
-    # Welch t-test
     from math import erf, sqrt
     def welch(a, b):
         a, b = np.array(a), np.array(b)
@@ -233,22 +253,32 @@ def main():
         t = (ma - mb) / se
         p = 2 * (1 - 0.5 * (1 + erf(abs(t) / sqrt(2))))
         return float(t), float(p)
-    t, p = welch(rwm_auc, base_auc)
-    print(f"  Welch t-test RWM vs Base : t={t:+.2f}, p={p:.4f}")
-    sig = "yes (*)" if p < 0.05 else "no"
-    print(f"  Statistically significant : {sig}")
+
+    print("\n  Welch t-tests :")
+    for label, (a, b) in [
+        ("RWM-unsup vs Base",   (rwm_u_auc, base_auc)),
+        ("RWM-sup vs Base",     (rwm_s_auc, base_auc)),
+        ("RWM-sup vs RWM-unsup",(rwm_s_auc, rwm_u_auc)),
+    ]:
+        t, p = welch(a, b)
+        sig = "yes (*)" if p < 0.05 else "no"
+        print(f"    {label:<26} t={t:+.2f}  p={p:.4f}  {sig}")
+
+    print("\n  Router accuracy comparison (1/3 = random) :")
+    print(f"    RWM-unsup : {np.mean(rwm_u_router):.3f}  (chance = 0.33)")
+    print(f"    RWM-sup   : {np.mean(rwm_s_router):.3f}  (chance = 0.33)")
+    t_router, p_router = welch(rwm_s_router, rwm_u_router)
+    print(f"    Welch RWM-sup vs RWM-unsup router : t={t_router:+.2f}, p={p_router:.4f}")
 
     Path("results").mkdir(exist_ok=True)
     out = {
         "rows": rows,
         "agg": {
-            "rwm_auroc_mean": float(np.mean(rwm_auc)),
-            "rwm_auroc_std": float(np.std(rwm_auc)),
+            "rwm_unsup_auroc_mean": float(np.mean(rwm_u_auc)),
+            "rwm_sup_auroc_mean": float(np.mean(rwm_s_auc)),
             "base_auroc_mean": float(np.mean(base_auc)),
-            "base_auroc_std": float(np.std(base_auc)),
-            "rwm_direct_regime_acc_mean": float(np.mean(rwm_direct)),
-            "delta_auroc": float(delta),
-            "welch_t": t, "welch_p": p,
+            "rwm_unsup_router_mean": float(np.mean(rwm_u_router)),
+            "rwm_sup_router_mean": float(np.mean(rwm_s_router)),
         },
     }
     def _d(o):

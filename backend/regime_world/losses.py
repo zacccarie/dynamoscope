@@ -92,6 +92,20 @@ def loss_lyap_proxy(z_slow: torch.Tensor, tau: int = 3,
     return (log_growth - target_log_growth) ** 2
 
 
+def loss_regime_supervised(r: torch.Tensor, regime_idx: int) -> torch.Tensor:
+    """Cross-entropy : router output vs ground-truth regime label.
+
+    r : (3,) softmax distribution.
+    regime_idx : 0=smooth, 1=periodic, 2=chaotic.
+
+    Used in semi-supervised training to break router collapse.
+    """
+    p = r.clamp_min(1e-9)
+    target = torch.tensor(regime_idx, device=r.device)
+    log_p = p.log()
+    return -log_p[target]
+
+
 def loss_entropy_regularizer(r: torch.Tensor, target_entropy: float = 0.8
                               ) -> torch.Tensor:
     """Encourage non-degenerate regime distribution.
@@ -112,6 +126,8 @@ def regime_conditional_loss(
     w_recur: float = 1.0,
     w_lyap: float = 1.0,
     w_entropy: float = 0.1,
+    w_regime_sup: float = 0.0,
+    regime_idx: int | None = None,
     target_log_growth_chaotic: float = 0.1,
     target_DET_periodic: float = 0.7,
 ) -> dict:
@@ -143,7 +159,13 @@ def regime_conditional_loss(
     # Entropy regularizer (anti-collapse)
     l_entropy = loss_entropy_regularizer(r) * w_entropy
 
-    total = l_recon + l_dyn + l_slow + l_recur + l_lyap + l_entropy
+    # Optional supervised regime CE (semi-supervised mode)
+    if w_regime_sup > 0 and regime_idx is not None:
+        l_regime_sup = loss_regime_supervised(r, regime_idx) * w_regime_sup
+    else:
+        l_regime_sup = r.sum() * 0.0  # zero, keeps grad graph
+
+    total = l_recon + l_dyn + l_slow + l_recur + l_lyap + l_entropy + l_regime_sup
     return {
         "total": total,
         "recon": l_recon,
@@ -152,6 +174,7 @@ def regime_conditional_loss(
         "recur_weighted": l_recur,
         "lyap_weighted": l_lyap,
         "entropy_reg": l_entropy,
+        "regime_sup": l_regime_sup,
         "r_smooth": float(r_smooth.item()),
         "r_periodic": float(r_periodic.item()),
         "r_chaotic": float(r_chaotic.item()),

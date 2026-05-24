@@ -25,6 +25,7 @@ class TrainConfig:
     w_recur: float = 0.5
     w_lyap: float = 0.3
     w_entropy: float = 0.1
+    w_regime_sup: float = 0.0  # 0 = unsupervised, > 0 = semi-supervised
     target_log_growth_chaotic: float = 0.1
     target_DET_periodic: float = 0.7
 
@@ -49,41 +50,45 @@ def stage_weights(epoch: int, n_epochs: int, cfg: TrainConfig) -> dict:
     """Schedule loss weights by stage."""
     s1 = int(0.3 * n_epochs)
     s2 = int(0.6 * n_epochs)
+    # Supervised regime weight : ramp up from stage 1 (if enabled)
+    w_sup = cfg.w_regime_sup
     if epoch < s1:
-        # recon + dyn only
+        # recon + dyn + (sup if any) — warmup
         return {"w_dyn": cfg.w_dyn, "w_slow": 0.0, "w_recur": 0.0,
-                "w_lyap": 0.0, "w_entropy": cfg.w_entropy * 0.5}
+                "w_lyap": 0.0, "w_entropy": cfg.w_entropy * 0.5,
+                "w_regime_sup": w_sup}
     elif epoch < s2:
-        # + slow + recur, uniformly (full weights, but model not yet
-        # regime-conditional aware via training signal — still uses r)
         return {"w_dyn": cfg.w_dyn, "w_slow": cfg.w_slow,
                 "w_recur": cfg.w_recur, "w_lyap": cfg.w_lyap * 0.3,
-                "w_entropy": cfg.w_entropy}
+                "w_entropy": cfg.w_entropy, "w_regime_sup": w_sup}
     else:
-        # full regime-conditional
         return {"w_dyn": cfg.w_dyn, "w_slow": cfg.w_slow,
                 "w_recur": cfg.w_recur, "w_lyap": cfg.w_lyap,
-                "w_entropy": cfg.w_entropy}
+                "w_entropy": cfg.w_entropy, "w_regime_sup": w_sup}
 
 
 def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
     """Train one epoch over a list of TrajSample. Returns aggregated stats."""
+    from .synth import REGIME_TO_IDX
     model.train()
     device = next(model.parameters()).device
     accum = {k: 0.0 for k in ["total", "recon", "dyn", "slow_weighted",
-                              "recur_weighted", "lyap_weighted", "entropy_reg"]}
+                              "recur_weighted", "lyap_weighted", "entropy_reg",
+                              "regime_sup"]}
     rs_accum = [0.0, 0.0, 0.0]
     n = 0
     for sample in dataset:
         x = torch.from_numpy(sample.traj).float().to(device)
-        # Standardize input (per-trajectory) for stable training
         x = (x - x.mean(0, keepdim=True)) / x.std(0, keepdim=True).clamp_min(1e-6)
         out = model(x)
+        regime_idx = REGIME_TO_IDX[sample.regime]
         loss_dict = regime_conditional_loss(
             out, x,
             w_recon=1.0, w_dyn=weights["w_dyn"],
             w_slow=weights["w_slow"], w_recur=weights["w_recur"],
             w_lyap=weights["w_lyap"], w_entropy=weights["w_entropy"],
+            w_regime_sup=weights.get("w_regime_sup", 0.0),
+            regime_idx=regime_idx,
             target_log_growth_chaotic=cfg.target_log_growth_chaotic,
             target_DET_periodic=cfg.target_DET_periodic,
         )
@@ -93,7 +98,8 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
         optim.step()
 
         for k in accum:
-            accum[k] += float(loss_dict[k].item() if hasattr(loss_dict[k], "item") else loss_dict[k])
+            v = loss_dict[k]
+            accum[k] += float(v.item() if hasattr(v, "item") else v)
         rs_accum[0] += loss_dict["r_smooth"]
         rs_accum[1] += loss_dict["r_periodic"]
         rs_accum[2] += loss_dict["r_chaotic"]

@@ -2,63 +2,70 @@
   "rows": [
     {
       "seed": 0,
-      "rwm_probe_auroc": 1.0,
-      "rwm_probe_acc": 1.0,
-      "rwm_direct_regime_acc": 0.4444444444444444,
+      "rwm_unsup_probe_auroc": 1.0,
+      "rwm_unsup_router_acc": 0.4444444444444444,
+      "rwm_sup_probe_auroc": 1.0,
+      "rwm_sup_router_acc": 0.7777777777777778,
       "base_probe_auroc": 1.0,
       "base_probe_acc": 1.0,
-      "rwm_train_time_s": 40.12146615982056,
-      "base_train_time_s": 34.20021891593933
+      "rwm_unsup_time_s": 35.8131890296936,
+      "rwm_sup_time_s": 35.22038912773132,
+      "base_time_s": 30.299072980880737
     },
     {
       "seed": 1,
-      "rwm_probe_auroc": 1.0,
-      "rwm_probe_acc": 1.0,
-      "rwm_direct_regime_acc": 0.3333333333333333,
+      "rwm_unsup_probe_auroc": 1.0,
+      "rwm_unsup_router_acc": 0.3333333333333333,
+      "rwm_sup_probe_auroc": 0.9512108262108262,
+      "rwm_sup_router_acc": 0.7222222222222222,
       "base_probe_auroc": 1.0,
       "base_probe_acc": 1.0,
-      "rwm_train_time_s": 39.629292726516724,
-      "base_train_time_s": 34.31784701347351
+      "rwm_unsup_time_s": 35.14624834060669,
+      "rwm_sup_time_s": 35.30747890472412,
+      "base_time_s": 29.979780912399292
     },
     {
       "seed": 2,
-      "rwm_probe_auroc": 0.9761904761904763,
-      "rwm_probe_acc": 0.8888888888888888,
-      "rwm_direct_regime_acc": 0.2222222222222222,
+      "rwm_unsup_probe_auroc": 0.9761904761904763,
+      "rwm_unsup_router_acc": 0.2222222222222222,
+      "rwm_sup_probe_auroc": 1.0,
+      "rwm_sup_router_acc": 0.5555555555555556,
       "base_probe_auroc": 1.0,
       "base_probe_acc": 1.0,
-      "rwm_train_time_s": 39.50005006790161,
-      "base_train_time_s": 34.073055028915405
+      "rwm_unsup_time_s": 35.15134000778198,
+      "rwm_sup_time_s": 35.32921504974365,
+      "base_time_s": 30.127634048461914
     },
     {
       "seed": 3,
-      "rwm_probe_auroc": 1.0,
-      "rwm_probe_acc": 1.0,
-      "rwm_direct_regime_acc": 0.2222222222222222,
+      "rwm_unsup_probe_auroc": 1.0,
+      "rwm_unsup_router_acc": 0.2222222222222222,
+      "rwm_sup_probe_auroc": 1.0,
+      "rwm_sup_router_acc": 0.6666666666666666,
       "base_probe_auroc": 1.0,
       "base_probe_acc": 1.0,
-      "rwm_train_time_s": 39.3395779132843,
-      "base_train_time_s": 34.03312802314758
+      "rwm_unsup_time_s": 35.277645111083984,
+      "rwm_sup_time_s": 35.3025438785553,
+      "base_time_s": 30.324877977371216
     },
     {
       "seed": 4,
-      "rwm_probe_auroc": 0.978835978835979,
-      "rwm_probe_acc": 0.9444444444444444,
-      "rwm_direct_regime_acc": 0.3333333333333333,
+      "rwm_unsup_probe_auroc": 0.978835978835979,
+      "rwm_unsup_router_acc": 0.3333333333333333,
+      "rwm_sup_probe_auroc": 0.9761904761904763,
+      "rwm_sup_router_acc": 0.3333333333333333,
       "base_probe_auroc": 1.0,
       "base_probe_acc": 1.0,
-      "rwm_train_time_s": 39.37850499153137,
-      "base_train_time_s": 34.01246094703674
+      "rwm_unsup_time_s": 35.14314079284668,
+      "rwm_sup_time_s": 35.229722023010254,
+      "base_time_s": 30.189361810684204
     }
   ],
   "agg": {
-    "rwm_auroc_mean": 0.991005291005291,
-    "rwm_auroc_std": 0.011047943395672492,
+    "rwm_unsup_auroc_mean": 0.991005291005291,
+    "rwm_sup_auroc_mean": 0.9854802604802604,
     "base_auroc_mean": 1.0,
-    "base_auroc_std": 0.0,
-    "rwm_direct_regime_acc_mean": 0.31111111111111106,
-    "delta_auroc": -0.008994708994709,
-    "welch_t": -1.6283046848759652,
-    "welch_p": 0.10346029660496159
+    "rwm_unsup_router_mean": 0.31111111111111106,
+    "rwm_sup_router_mean": 0.611111111111111
   }
 }
