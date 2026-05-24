@@ -91,10 +91,12 @@ def eval_sample(model, sample, kind="rwm"):
         out = model(x)
         z = out["z_slow"]; zp = out["z_slow_pred"]
         if z.shape[0] < 2:
-            return {"mse": float("nan"), "router": [0, 0, 0], "lstd": 0}
+            return {"mse": float("nan"), "router": [0, 0, 0], "lstd": 0,
+                    "d_dyn": [0, 0, 0, 0]}
         mse = float(((zp[:-1] - z[1:]) ** 2).mean().item())
         return {"mse": mse, "router": out["r"].cpu().numpy().tolist(),
-                "lstd": float(z.std(0).mean().item())}
+                "lstd": float(z.std(0).mean().item()),
+                "d_dyn": out["d_dyn"].cpu().numpy().tolist()}
     else:
         out = model(x)
         z = out["z_seq"]; zp = out["z_pred"]
@@ -105,7 +107,7 @@ def eval_sample(model, sample, kind="rwm"):
 
 
 def aggregate(samples, model, kind="rwm"):
-    mses, lstds, routers = [], [], []
+    mses, lstds, routers, d_dyns = [], [], [], []
     regimes_true = []
     correct = 0
     for s in samples:
@@ -114,6 +116,7 @@ def aggregate(samples, model, kind="rwm"):
         lstds.append(r["lstd"])
         if kind == "rwm":
             routers.append(r["router"])
+            d_dyns.append(r["d_dyn"])
             true_idx = REGIME_TO_IDX[s.regime]
             pred_idx = int(np.argmax(r["router"]))
             if pred_idx == true_idx:
@@ -124,6 +127,22 @@ def aggregate(samples, model, kind="rwm"):
     if kind == "rwm":
         out["router_mean"] = np.array(routers).mean(axis=0).tolist()
         out["router_acc"] = correct / max(len(samples), 1)
+        # Descriptor separability : variance of d_dyn within regime vs across
+        d_arr = np.array(d_dyns)
+        regs = np.array(regimes_true)
+        # Within-regime variance / Across-regime variance per dim
+        within = []
+        for reg in ["smooth", "periodic", "chaotic"]:
+            mask = regs == reg
+            if mask.sum() > 1:
+                within.append(d_arr[mask].var(axis=0))
+        within_avg = np.mean(within, axis=0) if within else np.zeros(4)
+        across = d_arr.var(axis=0)
+        # Sep ratio : across/within. > 1 = separable
+        sep_ratio = (across / np.maximum(within_avg, 1e-9)).tolist()
+        out["desc_sep_ratio"] = [float(s) for s in sep_ratio]
+        out["desc_mean_across"] = across.tolist()
+        out["desc_mean_within"] = within_avg.tolist()
     return out
 
 
@@ -141,8 +160,8 @@ def split_by_regime(samples, train_ratio=0.7, seed=0):
     return train, evals
 
 
-def run_one_seed(seed: int, n_videos_per_regime=4, n_frames=64,
-                 window=32, stride=8, n_epochs=40):
+def run_one_seed(seed: int, n_videos_per_regime=4, n_frames=128,
+                 window=64, stride=16, n_epochs=40):
     print(f"\n=== SEED {seed} ===")
     samples = build_windowed_dataset(
         n_videos_per_regime=n_videos_per_regime, n_frames_per_video=n_frames,
@@ -190,9 +209,13 @@ def run_one_seed(seed: int, n_videos_per_regime=4, n_frames=64,
         flat_m = aggregate(ds, flat, kind="flat")
         results[dist] = {"rwm": rwm_m, "flat": flat_m,
                           "ratio_rwm_flat": rwm_m["mse_mean"] / max(flat_m["mse_mean"], 1e-9)}
-        print(f"  {dist:<8}: RWM mse={rwm_m['mse_mean']:.4f}  "
-              f"Flat mse={flat_m['mse_mean']:.4f}  ratio={results[dist]['ratio_rwm_flat']:.2f}  "
+        print(f"  {dist:<8}: RWM mse={rwm_m['mse_mean']:.4f}  lstd={rwm_m['lstd_mean']:.3f}  "
+              f"Flat mse={flat_m['mse_mean']:.4f}  lstd={flat_m['lstd_mean']:.3f}  "
+              f"ratio={results[dist]['ratio_rwm_flat']:.2f}  "
               f"router_acc={rwm_m.get('router_acc', 0):.2f}")
+        sep = rwm_m.get("desc_sep_ratio", [0, 0, 0, 0])
+        print(f"          desc sep ratio (slow/recur/lyap/var) : "
+              f"({sep[0]:.2f},{sep[1]:.2f},{sep[2]:.2f},{sep[3]:.2f})  >1=separable")
     return {"seed": seed, "results": results,
              "rwm_params": rwm.count_params(), "flat_params": n_flat}
 
