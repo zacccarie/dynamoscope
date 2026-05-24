@@ -4,6 +4,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[english]{babel}
 \usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
 \usepackage{graphicx}
 \usepackage{geometry}
 \usepackage{hyperref}
@@ -80,10 +81,23 @@ model beats the matched-capacity flat baseline by 3.3$\times$ on
 out-of-distribution one-step prediction MSE; on procedural-video
 DINOv2 features with a router-hyperparameter fix it reaches
 28$\times$ with router accuracy 0.84.
+\textbf{Critical caveat (F10).} When we replace the 1-step
+evaluation by an autoregressive multi-step rollout
+($\S$\ref{sec:rwm-rollout}), the regime-aware model diverges
+catastrophically: latent MSE blows up from $0.022$ at $K{=}1$ to
+$4.6{\times}10^9$ at $K{=}24$, while the flat baseline remains
+stable around $0.13$. The 1-step advantage does \emph{not} transfer
+to long horizons; the mixture residual MLPs are uncontracted and the
+1-step objective rewards derivative quality without enforcing
+integral stability. This validates the circularity warning issued
+elsewhere in the paper and reframes the architectural claim as
+``better local tangent, worse global flow''.
 
 \textbf{We are explicit about what these results do not show.}
-Evaluation is one-step prediction MSE in latent space, i.e.\ the
-model's own training objective---not long-horizon rollout fidelity.
+The architectural comparisons are dominated by 1-step latent-space MSE,
+i.e.\ the model's own training objective; the one rollout experiment
+we do run (Sec.~\ref{sec:rwm-rollout}) falsifies the implied stability
+of that local advantage.
 No downstream task (planning, control, anomaly detection) is tested.
 Data is procedurally generated, not real action video. Regime labels
 are required for training. The architecture is small (134K
@@ -1574,6 +1588,7 @@ These six modes outline the actual scope of the architecture: it is
 only useful when training data spans the regime space.
 
 \subsection{Phase 1 positive result: mixed-regime training}
+\label{sec:rwm-mixed}
 
 We re-run the comparison with the same architecture but balanced
 training data (eight synthetic systems across smooth, periodic, and
@@ -1891,6 +1906,84 @@ with router accuracy $84\%$.
   report ratios, not significance tests.
 \end{itemize}
 
+\subsection{Multi-step rollout : the 1-step advantage does not transfer}
+\label{sec:rwm-rollout}
+
+All experiments so far measured one-step prediction MSE in the slow
+latent space --- exactly the model's training objective. This is
+partially circular as an evaluation. We address it directly.
+
+We add an autoregressive rollout test : encode a short context
+(16 frames = 4 slow steps), then iterate the regime-mixture
+dynamics $\hat z_{t+1} = \sum_k r_t^{(k)}\, \Phi_k(z_t)$ for
+$K \in \{1,2,4,8,16,24\}$ steps. Compare predicted $\hat z_{t+k}$
+to ground-truth $z_{t+k}$ encoded from the full trajectory.
+
+\begin{table}[h]
+\centering
+\caption{Multi-step rollout MSE per step. RWM-sup vs Flat-32 vs
+Flat-56 (matched-capacity), mixed-regime synthetic training, 3
+seeds, mean.}
+\label{tab:rwm-rollout}
+\begin{tabular}{rrrrr}
+\toprule
+$K$ & RWM MSE & F32 MSE & F56 MSE & RWM/F56 \\
+\midrule
+1 & $0.022$ & $0.010$ & $0.012$ & $1.84$ \\
+2 & $0.155$ & $0.017$ & $0.021$ & $7.44$ \\
+4 & $1.454$ & $0.037$ & $0.044$ & $33$ \\
+8 & $1.02 \times 10^{2}$ & $0.068$ & $0.095$ & $1\,070$ \\
+16 & $5.99 \times 10^{5}$ & $0.092$ & $0.141$ & $4.26 \times 10^{6}$ \\
+24 & $4.57 \times 10^{9}$ & $0.089$ & $0.134$ & $\bm{3.4 \times 10^{10}}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{(F10) Catastrophic rollout divergence.} The RWM autoregressive
+rollout \emph{diverges} : MSE grows from $0.022$ at $K{=}1$ to
+$4.57\times 10^9$ at $K{=}24$. The flat-GRU baseline at matched
+capacity stays stable, plateauing near $0.13$ across all $K$. By
+$K{=}24$ the RWM/F56 ratio is $3.4 \times 10^{10}$ : ten orders
+of magnitude \emph{worse}.
+
+\paragraph{Mechanism.} The three transition modules $\Phi_k$ are
+residual MLPs with no stability constraint. The chaotic
+expert has init scale 1.0 (designed for divergence). The smooth
+expert (init 0.3) provides a contractive bias \emph{locally} but
+nothing constrains the global Lyapunov spectrum of the mixture.
+Once rollout enters a region of latent space outside the training
+support, $\Phi_{\text{chaotic}}$ amplifies; the mixture has no
+restoring force. Errors compound exponentially.
+
+\paragraph{The headline must be qualified.} The $28\times$ advantage
+on one-step Phase 2 prediction MSE (Table~\ref{tab:rwm-video-summary})
+measures derivative quality. The rollout result here measures integral
+quality (attractor preservation). They are not the same thing :
+\textbf{the regime-aware architecture is a better one-step predictor
+but not a better world model in the multi-step sense.} The 1-step
+circularity caveat we documented in $\S$\ref{sec:not-claim} was
+not merely cautious framing : the rollout test below confirms it
+catastrophically.
+
+\paragraph{Implications for the architecture.}
+\begin{itemize}
+\item $\Phi_k$ expressivity needs an explicit stability constraint :
+  bounded operator norm, Lyapunov regularization, or replacement
+  by contracting modules (input-convex networks, Koopman with
+  spectral clipping).
+\item The mixture-of-experts framing must include a stability term
+  in the loss : $\mathcal{L}_{\text{stability}} \propto
+  \mathrm{ReLU}(\lambda_{\max}(\partial \hat z_{t+1} / \partial z_t) - 1)$.
+\item Even better, predict in a bounded latent (e.g.\ project to
+  hypersphere or hypercube) so divergence is geometrically
+  impossible.
+\end{itemize}
+
+We do not implement these fixes in this paper. The negative result
+itself is the most important Phase 1 finding : it falsifies the
+"world model" framing of the 28$\times$ result and reorients the
+research direction toward stability-constrained dynamics.
+
 \section{What This Paper Does Not Claim}
 \label{sec:not-claim}
 
@@ -1907,14 +2000,20 @@ honest documentation of nine failure modes that surround it, not in a
 fundamentally new mechanism.
 
 \paragraph{We do not claim better world models in the
-RL/planning sense.} Every evaluation in this paper measures
-\emph{one-step prediction MSE in the model's own latent space}. This
-is what the model directly optimizes and is therefore partially
-circular as an evaluation. A genuine world-model benchmark would
-require: (i) long-horizon rollout fidelity vs.\ ground-truth
-trajectories, (ii) downstream task performance (planning, control,
-anomaly detection), (iii) sample efficiency in an RL loop. None of
-these are reported here.
+RL/planning sense.} Every architectural comparison in this paper
+is dominated by \emph{one-step prediction MSE in the model's own
+latent space}, which is what the model directly optimizes and is
+therefore partially circular. The one experiment that breaks the
+circularity --- an autoregressive K-step rollout in latent space
+(Sec.~\ref{sec:rwm-rollout}) --- \emph{actively falsifies} the
+implied transfer: at $K{=}24$ the regime-aware model is roughly
+$3.4{\times}10^{10}$ \emph{worse} than the matched-capacity flat
+baseline (Table~\ref{tab:rwm-rollout}, failure mode F10). A
+genuine world-model benchmark would still further require
+(ii) downstream task performance (planning, control, anomaly
+detection), (iii) sample efficiency in an RL loop, and a
+stability-augmented architecture that does not diverge. None of
+those are reported.
 
 \paragraph{We do not claim ecological validity on real video.} The
 ``video'' in the Phase 2 experiment is procedurally generated
@@ -1970,10 +2069,16 @@ For convenience the limitations scattered across the paper are
 collected here:
 
 \begin{enumerate}[label=L\arabic*., leftmargin=*]
-\item \textbf{Evaluation metric circularity.} All architectural
-  comparisons use 1-step latent-space MSE, which is the model's own
-  training objective. No multi-step rollout, no decoder-MSE, no
-  downstream-task evaluation.
+\item \textbf{Evaluation metric circularity (partially closed,
+  catastrophically).} Architectural comparisons in
+  $\S$\ref{sec:rwm-mixed}--\ref{sec:rwm-video-final} use 1-step
+  latent-space MSE, which is the model's own training objective.
+  We close the loop with one multi-step rollout experiment
+  (Sec.~\ref{sec:rwm-rollout}, L13 below) and the result is a
+  catastrophic failure: the regime-aware model diverges
+  ($\mathrm{MSE}{\sim}10^9$) where the flat baseline stays bounded
+  ($\mathrm{MSE}{\sim}10^{-1}$). No decoder-MSE and no downstream-task
+  evaluation are reported.
 \item \textbf{Lyapunov estimator weak on discrete chaos.} The
   Rosenstein estimator implemented here works on Lorenz and the
   circle but saturates on the logistic map at $r{=}4$
@@ -2005,6 +2110,18 @@ collected here:
 \item \textbf{No matched-encoder comparison on real video.} We use
   frozen DINOv2-S; we do not compare against, e.g., a from-scratch
   encoder trained jointly with the world model.
+\item \textbf{Catastrophic rollout divergence (F10).} Autoregressive
+  K-step rollout in the regime-mixture dynamics is numerically
+  unstable: latent MSE explodes from $0.022$ at $K{=}1$ to
+  $4.6{\times}10^9$ at $K{=}24$, while a parameter-matched flat-GRU
+  baseline stays at $\sim 0.13$ over the entire horizon
+  (Sec.~\ref{sec:rwm-rollout}). Root cause: each
+  regime-expert $\Phi_k$ is a residual MLP with no contraction
+  constraint, no spectral clipping, and no stability term in the
+  1-step training loss; the mixture amplifies errors over iterates.
+  This caps the architecture's usefulness as a multi-step
+  \emph{world} model and reframes the 1-step advantage as a
+  derivative-quality result.
 \end{enumerate}
 
 \section{Conclusion}
