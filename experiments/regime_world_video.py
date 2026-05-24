@@ -76,10 +76,13 @@ def train_baseline_video(model, dataset, n_epochs=40, lr=3e-4, device="cpu"):
     return model
 
 
-def train_rwm_video(rwm, dataset, n_epochs, w_regime_sup=1.0):
+def train_rwm_video(rwm, dataset, n_epochs, w_regime_sup=5.0,
+                    w_entropy=0.0):
+    """Updated defaults : entropy=0, sup=5 (router-fix config from
+    experiments/regime_world_router_fix.py)."""
     cfg = TrainConfig(n_epochs=n_epochs, lr=3e-4, device="cpu",
                        w_dyn=1.0, w_slow=1.0, w_recur=0.5, w_lyap=0.3,
-                       w_entropy=0.1, w_regime_sup=w_regime_sup)
+                       w_entropy=w_entropy, w_regime_sup=w_regime_sup)
     return train(rwm, dataset, cfg, verbose=False)
 
 
