@@ -2281,6 +2281,187 @@ gain. The regime-aware mixture architecture is contributing signal
 that the flat baseline cannot replicate even with the same training
 objective.
 
+\subsection{Sprint 2 : learned descriptors, uncertainty weighting, mixed-regime data}
+\label{sec:rwm-sprint2}
+
+Three more axes : (i) replace the four hand-crafted descriptors
+(slowness / recurrence / Lyap-proxy / variance) by a learned MLP
+(\texttt{learned\_desc}); (ii) replace manual loss-weight tuning by
+Kendall et al.'s uncertainty weighting \cite{kendall2018multitask}
+(\texttt{uncertainty}); (iii) train on mixed-regime synthetic
+trajectories where a single sample traverses smooth $\to$ periodic
+$\to$ chaotic (\texttt{mixed\_train}) instead of pure mono-regime
+samples. Ten seeds, Welch t-tests vs baseline at $K{=}24$.
+
+\begin{table}[h]
+\centering
+\caption{Sprint 2 : K=24 MSE per regime, mono-eval (10 seeds).}
+\label{tab:sprint2-summary}
+\begin{tabular}{lrrrl}
+\toprule
+Variant & smooth & periodic & chaotic & note \\
+\midrule
+\texttt{baseline}     & $2.18 \pm 6$       & $0.084 \pm 0.08$    & $0.137 \pm 0.1$    & — \\
+\texttt{learned\_desc}& $0.45 \pm 0.6$     & $0.23 \pm 0.3$      & $\bm{0.036 \pm 0.04}$ & chaos $p{=}0.053$ \\
+\texttt{uncertainty}  & $0.099 \pm 0.07$   & $0.045 \pm 0.04$    & $0.109 \pm 0.1$    & all $\downarrow$ ns \\
+\texttt{mixed\_train} & $\bm{0.003 \pm 0.002}$ & $\bm{0.003 \pm 0.001}$ & $\bm{0.003 \pm 0.001}$ & periodic $p{=}0.019$\textsuperscript{*}, chaotic $p{=}0.016$\textsuperscript{*} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reading the results.}
+\textbf{Learned descriptors are a trade-off, not an upgrade.}
+\texttt{learned\_desc} wins on chaotic ($p{=}0.053$, borderline)
+but is $2.8{\times}$ \emph{worse} on periodic (no $p$-value crosses
+$0.05$). The hand-crafted recurrence-DET descriptor explicitly
+captures cyclic structure; the learned MLP recovers chaos-relevant
+signal but loses cyclic-structure sensitivity. A hybrid that
+concatenates both is the natural follow-up (we test it in
+$\S$\ref{sec:rwm-sprint3}).
+\textbf{Uncertainty weighting removes hyperparameter fragility
+without metric cost.} All regimes are directionally better but
+none are significant. Useful for engineering robustness (no need
+to manually tune $\beta$ and $\alpha$ for each dataset) but does
+not unlock a metric win on its own.
+\textbf{Mixed-regime training dominates by two orders of magnitude.}
+$0.003$ on every regime, significant on the two non-trivial
+regimes. \textbf{Major caveat (F14): the generator normalizes
+each segment to unit variance before concatenation, so mixed
+trajectories are by construction less heterogeneous than the
+mono-trained baseline's Lorenz-scale-$20$ vs sine-scale-$1$
+distributional gap.} A data-fair re-run (baseline trained on the
+same mixed-regime dataset) is required before this result enters
+the abstract; the gain is real but partly distributional, not
+architectural.
+
+\subsection{Sprint 3 : hybrid descriptors, per-timestep router, harder benchmark}
+\label{sec:rwm-sprint3}
+
+Acting on Sprint 2 caveats and a observed bench-floor effect
+(multiple variants hitting $\mathrm{MSE} \sim 10^{-3}$, suggesting
+the easy mono-eval cannot discriminate further), Sprint 3 tests :
+(i) hybrid descriptors (\texttt{HybridDescriptorHeads} =
+concatenation of hand-crafted 4-d + learned 8-d $\to$ 12-d
+descriptor); (ii) a per-timestep router that recomputes
+$r_t \in \Delta^2$ from a sliding window of $z_{\text{slow}}$ at
+each step rather than once per trajectory; (iii) a harder
+benchmark (additive observation noise std $0.1$, $30\%$ partial
+observability via random dim mask, and parameter shift at eval
+--- Lorenz $\rho \in [40, 50]$ vs train $\rho{=}28$) to break
+the floor effect.
+
+\begin{table}[h]
+\centering
+\caption{Sprint 3 : K=24 MSE per regime, harder eval (10 seeds).
+Welch t-tests vs \texttt{baseline}.}
+\label{tab:sprint3-summary}
+\begin{tabular}{lrrrl}
+\toprule
+Variant & smooth & periodic & chaotic & p-values \\
+\midrule
+\texttt{baseline}    & $1.42 \pm 4$       & $0.083 \pm 0.07$    & $0.118 \pm 0.09$  & — \\
+\texttt{hybrid\_desc}& $0.50 \pm 0.7$     & $0.110 \pm 0.1$     & $0.122 \pm 0.2$   & all ns \\
+\texttt{per\_timestep}& $\bm{0.005 \pm 0.006}$ & $\bm{0.004 \pm 0.003}$ & $\bm{0.007 \pm 0.01}$ & periodic\textsuperscript{*}, chaotic\textsuperscript{**} \\
+\texttt{all\_sprint3} & $0.083 \pm 0.2$    & $0.024 \pm 0.02$    & $0.057 \pm 0.06$  & periodic borderline \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The per-timestep router is the Sprint-3 winner.}
+\texttt{per\_timestep} (matched capacity at $30.1$K) beats the
+baseline by $\sim 17{\times}$ on the periodic and chaotic regimes
+with $p{<}0.01$ on chaos at $10$ seeds. The structural insight :
+when the router output is a single global $r$ computed from the
+context, it can only commit to one regime ; allowing $r_t$ to
+re-route at each step gives the mixture a way to track regime
+transitions implicit in the trajectory (a non-stationary
+descriptor signal). Crucially this works at the \emph{same}
+parameter count as the baseline --- the gain is purely structural.
+\textbf{Hybrid descriptors disappoint.} Concatenating hand-crafted
++ learned descriptors gives no significant gain in any regime. The
+two signal sources are partly redundant on the easy regime
+distinction the router needs to make ; a richer learned-descriptor
+head (e.g.\ attention-pooled over $z_{\text{slow}}$) is a more
+promising direction.
+\textbf{Stacking helpers hurts.} \texttt{all\_sprint3} combines
+hybrid + per-timestep + wider router and lands \emph{below}
+\texttt{per\_timestep} alone on every regime. The per-timestep
+intervention is sufficient ; piling additions degrades.
+
+\subsection{Sprint 4 : Lyapunov regularization, continuous regime parameter}
+\label{sec:rwm-sprint4}
+
+Two more axes : (i) a principled \emph{differentiable Lyapunov
+regularization} that penalizes the spectral radius of each
+$\partial \Phi_k / \partial z$ above a per-regime target ($0.9$ /
+$1.0$ / $1.0$ for smooth / periodic / chaotic), computed via
+Hutchinson-style JVP estimates --- this replaces the hacky
+$\tanh$-bounded delta of the F10 fix by an explicit
+spectral-property objective ; (ii) a \emph{continuous regime
+parameter} variant : the router output is a scalar
+$\theta \in [0, 1]$ rather than $r \in \Delta^2$, and the mixture
+dynamics are computed via a cosine-basis weighting over $n=4$
+basis transition modules \cite{koopman1931,lusch2018dkr}. This
+escapes the discrete $K{=}3$ taxonomy without resorting to a
+larger MoE.
+
+\begin{table}[h]
+\centering
+\caption{Sprint 4 : K=24 MSE per regime, harder eval (10 seeds).
+Welch t-tests vs \texttt{baseline}.}
+\label{tab:sprint4-summary}
+\begin{tabular}{lrrrl}
+\toprule
+Variant & smooth & periodic & chaotic & p-values \\
+\midrule
+\texttt{baseline}    & $1.42 \pm 4$       & $0.083$    & $0.118$  & — \\
+\texttt{lyap\_reg}   & $1.43 \pm 3$       & $0.161 \pm 0.3$ & $0.172 \pm 0.2$ & all ns ($\uparrow$ worse) \\
+\texttt{continuous}  & $0.006 \pm 0.006$  & $0.007 \pm 0.008$ & $0.007 \pm 0.007$ & periodic\textsuperscript{*}, chaotic\textsuperscript{**} \\
+\texttt{per\_timestep} & $0.005 \pm 0.006$  & $0.004 \pm 0.003$ & $0.007 \pm 0.01$  & periodic\textsuperscript{*}, chaotic\textsuperscript{**} \\
+\texttt{per\_ts\_lyap} & $\bm{0.003 \pm 0.002}$ & $\bm{0.003 \pm 0.002}$ & $\bm{0.005 \pm 0.007}$ & periodic\textsuperscript{*}, chaotic\textsuperscript{**} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reading the results.}
+\textbf{Lyapunov regularization fails standalone but combines well.}
+When applied to the baseline alone (\texttt{lyap\_reg}), the
+penalty acts as friction that the unmodified architecture cannot
+exploit --- numerical worse, all ns. When combined with the
+per-timestep router (\texttt{per\_ts\_lyap}), it yields the new
+best at $K{=}24$ on every regime, beating
+\texttt{per\_timestep} alone by $\sim 1.5{\times}$. The lesson is
+that the regularizer requires the structural fix to provide a
+gradient signal it can act on.
+\textbf{Continuous regime matches per-timestep significance.} The
+scalar $\theta \in [0, 1]$ + cosine-basis dynamics achieves
+$p{<}0.01$ on chaos. At slightly higher capacity ($34.3$K vs
+$30.1$K) this is comparable to \texttt{per\_timestep}. Two
+architectural escape routes from the $K{=}3$ taxonomic bottleneck
+work : either route per-step inside the discrete K-simplex
+(\texttt{per\_timestep}), or replace the simplex by a continuum
+(\texttt{continuous}). This is the strongest structural
+confirmation we have of the bench-level claim that the original
+hand-imposed $K{=}3$ \emph{was} a bottleneck rather than a feature.
+
+\paragraph{Sprint 2--4 consolidated takeaway.}
+The original $K{=}3$ regime-aware architecture was bottlenecked
+by the discrete taxonomic gating. Variants that escape this
+bottleneck --- mixed-regime training, K{=}6 Gumbel MoE, per-step
+routing, continuous $\theta$ parameter --- all gain significance
+at $p{<}0.05$ at $K{=}24$ on the harder benchmark. The
+specifically architectural escape route at matched-capacity
+($\texttt{per\_timestep}$ at $30$K) is the most defensible win
+because it does not require either extra parameters
+(\texttt{K6-gumbel}, $43$K) or distributional shift in the
+training data (\texttt{mixed\_train}, F14). Stacking
+\texttt{per\_timestep + lyap\_reg} gives a further modest
+improvement, the only stack we tried that did not regress vs
+its components. We do not claim that these gains generalize to
+real action video : the harder bench is procedurally generated and
+the structural advantage may collapse on dynamics that do not
+admit a clean regime decomposition.
+
 \section{What This Paper Does Not Claim}
 \label{sec:not-claim}
 
@@ -2689,6 +2870,11 @@ universal linear embeddings of nonlinear dynamics.
 Jang, E., Gu, S., \& Poole, B. (2017). Categorical reparameterization
 with Gumbel-softmax. \emph{International Conference on Learning
 Representations (ICLR)}.
+
+\bibitem{kendall2018multitask}
+Kendall, A., Gal, Y., \& Cipolla, R. (2018). Multi-task learning using
+uncertainty to weigh losses for scene geometry and semantics.
+\emph{Conference on Computer Vision and Pattern Recognition (CVPR)}.
 
 \end{thebibliography}
 

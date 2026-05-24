@@ -133,6 +133,75 @@ class DescriptorHeads(nn.Module):
         return torch.stack([slowness, recur_score, lyap_proxy, var_proxy])
 
 
+class LearnedDescriptorHeads(nn.Module):
+    """Sprint 2 #11 : learned descriptors via small MLP over windowed
+    z_slow statistics, replacing hand-crafted (slowness, recur, lyap, var).
+
+    Architecture :
+      input  = (z_slow_mean, z_slow_std, z_slow_diff_norm, z_slow_recur_proxy)
+               concatenated over the trajectory → richer summary
+      MLP    : 4*D_slow → 64 → d_out
+      output = d_out-dimensional descriptor vector
+
+    Trained jointly via dyn / recon losses + optional InfoNCE contrastive
+    on z_slow windows (loss_contrastive_descriptors in losses.py).
+    """
+
+    def __init__(self, d_slow: int = 32, d_out: int = 8, hidden: int = 64):
+        super().__init__()
+        self.d_d = d_out
+        # Pre-stats projection : we feed 4×D_slow of pooled stats.
+        in_dim = 4 * d_slow
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden), nn.SiLU(),
+            nn.Linear(hidden, d_out),
+        )
+
+    def forward(self, z_slow: torch.Tensor) -> torch.Tensor:
+        T_s = z_slow.shape[0]
+        if T_s < 2:
+            return torch.zeros(self.d_d, device=z_slow.device, dtype=z_slow.dtype)
+        # Pooled features per latent dim
+        mean = z_slow.mean(dim=0)           # (D,)
+        std = z_slow.std(dim=0)             # (D,)
+        diff = (z_slow[1:] - z_slow[:-1])   # (T-1, D)
+        diff_norm = diff.norm(dim=0)        # (D,) — cumulative speed
+        # Recurrence proxy = std of pairwise distances
+        d_ij = torch.cdist(z_slow, z_slow)
+        recur = d_ij.std(dim=0)             # (D? no, (T_s,)) — need pool to (D,)
+        # Actually recurrence per dim doesn't make sense in this form; use
+        # repeated value matching mean (D,) shape for concat.
+        recur_pool = d_ij.mean() * torch.ones_like(mean)
+        feats = torch.cat([mean, std, diff_norm, recur_pool], dim=0)  # (4D,)
+        return self.net(feats)
+
+
+class HybridDescriptorHeads(nn.Module):
+    """Sprint 3 #1 : concatenation of hand-crafted (DescriptorHeads) +
+    learned (LearnedDescriptorHeads) descriptors.
+
+    Motivation : Sprint 2 a montré que learned_desc gagne sur chaos mais
+    perd sur periodic. Hand-crafted (DET via recurrence) reste meilleur
+    pour periodic. La somme des deux devrait préserver les forces de
+    chacun.
+
+    Output dim = 4 (hand-crafted) + d_learned (default 8) = 12 par défaut.
+    """
+
+    def __init__(self, d_slow: int = 32, d_learned: int = 8,
+                 learned_hidden: int = 64):
+        super().__init__()
+        self.hand = DescriptorHeads(d_slow)
+        self.learned = LearnedDescriptorHeads(d_slow, d_out=d_learned,
+                                                hidden=learned_hidden)
+        self.d_d = 4 + d_learned
+
+    def forward(self, z_slow: torch.Tensor) -> torch.Tensor:
+        h = self.hand(z_slow)        # (4,) — fixed descriptors
+        l = self.learned(z_slow)     # (d_learned,) — learned descriptors
+        return torch.cat([h, l], dim=-1)  # (4 + d_learned,)
+
+
 class RegimeRouter(nn.Module):
     """MLP(d_dyn) → softmax over n_regimes.
 
@@ -323,6 +392,79 @@ class RegimeMixtureDynamics(nn.Module):
             return (preds * r_b).sum(dim=0)
 
 
+class ContinuousRegimeRouter(nn.Module):
+    """Sprint 4 #5 : continuous regime parameter θ ∈ ℝ au lieu de
+    softmax sur K régimes discrets.
+
+    Output θ ∈ [0, 1] (sigmoid). Interprétation : 0 = smooth, 0.5 =
+    periodic, 1 = chaotic. Continuous interpolation possible.
+
+    Used with ContinuousRegimeDynamics qui mélange basis transitions
+    selon cos-basis weighting de θ.
+    """
+
+    def __init__(self, d_d: int = 4, hidden: int = 32):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(d_d, hidden), nn.SiLU(),
+            nn.Linear(hidden, 1),
+        )
+
+    def forward(self, d_dyn: torch.Tensor) -> torch.Tensor:
+        # Output : scalar in [0, 1]. Squeeze last dim.
+        return torch.sigmoid(self.net(d_dyn)).squeeze(-1)
+
+
+class ContinuousRegimeDynamics(nn.Module):
+    """Sprint 4 #5 : mixture dynamics paramétrée par scalaire θ ∈ [0, 1].
+
+    z_{t+1} = Σ_k c_k(θ) · Φ_k(z)
+    avec c_k(θ) = softmax_k(cos(k π θ)) — Fourier-style basis weighting.
+
+    n_basis = nombre de transitions de base (default 4). Plus de basis =
+    finer interpolation. Chaque Φ_k a un init scale et delta_scale différent
+    pour induire diversité expressive.
+    """
+
+    def __init__(self, d_slow: int = 32, n_basis: int = 4,
+                 stable: bool = True):
+        super().__init__()
+        import numpy as _np
+        # Spread expert "intensity" linearly across the basis.
+        delta_scales = _np.linspace(0.1, 0.5, n_basis).tolist()
+        init_scales = _np.linspace(0.3, 1.0, n_basis).tolist()
+        self.transitions = nn.ModuleList([
+            TransitionModule(d_slow=d_slow, init_scale=init_scales[k],
+                              stable=stable, delta_scale=delta_scales[k])
+            for k in range(n_basis)
+        ])
+        self.n_basis = n_basis
+
+    def forward(self, z_slow: torch.Tensor, theta) -> torch.Tensor:
+        """
+        z_slow : (T_s, D_slow)
+        theta  : scalar (1-D, broadcast) or (T_s,)
+        """
+        import math
+        if isinstance(theta, float):
+            theta_t = torch.tensor(theta, device=z_slow.device)
+        else:
+            theta_t = theta
+        # cos-basis weights : c_k(θ) = cos(k·π·θ)
+        coefs = torch.stack([
+            torch.cos(k * math.pi * theta_t) for k in range(self.n_basis)
+        ], dim=0)   # (n_basis,) or (n_basis, T_s)
+        coefs = F.softmax(coefs, dim=0)
+        preds = torch.stack([phi(z_slow) for phi in self.transitions], dim=0)
+        # preds : (n_basis, T_s, D_slow)
+        if coefs.dim() == 1:
+            c_b = coefs.view(-1, 1, 1)
+            return (preds * c_b).sum(dim=0)
+        else:
+            c_b = coefs.unsqueeze(-1)
+            return (preds * c_b).sum(dim=0)
+
+
 class RegimeWorldModel(nn.Module):
     """Assembled : encoder + fast/slow SSM + descriptors + router + mixture dynamics."""
 
@@ -331,21 +473,49 @@ class RegimeWorldModel(nn.Module):
                  router_temperature: float = 1.0, stable: bool = False,
                  koopman: bool = False, koopman_residual: bool = False,
                  router_hidden: int = 32, router_skip: bool = False,
-                 router_gumbel: bool = False, router_gumbel_hard: bool = False):
+                 router_gumbel: bool = False, router_gumbel_hard: bool = False,
+                 learned_descriptors: bool = False,
+                 learned_desc_dim: int = 8,
+                 hybrid_descriptors: bool = False,
+                 per_timestep_router: bool = False, router_window: int = 4,
+                 continuous_regime: bool = False, n_basis: int = 4):
         super().__init__()
         self.encoder = PerceptualEncoder(d_in, d_fast)
         self.ssm = FastSlowSSM(d_fast, d_slow, slow_stride)
-        self.desc_heads = DescriptorHeads(d_slow)
-        self.router = RegimeRouter(
-            d_d=4, hidden=router_hidden, n_regimes=n_regimes,
-            temperature=router_temperature,
-            skip_connection=router_skip,
-            gumbel=router_gumbel, gumbel_hard=router_gumbel_hard,
-        )
-        self.dynamics = RegimeMixtureDynamics(
-            d_slow, n_regimes, stable=stable,
-            koopman=koopman, koopman_residual=koopman_residual,
-        )
+        self.learned_descriptors = learned_descriptors
+        self.hybrid_descriptors = hybrid_descriptors
+        self.per_timestep_router = per_timestep_router
+        self.router_window = router_window
+        self.continuous_regime = continuous_regime
+        if hybrid_descriptors:
+            self.desc_heads = HybridDescriptorHeads(d_slow,
+                                                     d_learned=learned_desc_dim)
+            d_d_router = 4 + learned_desc_dim
+        elif learned_descriptors:
+            self.desc_heads = LearnedDescriptorHeads(d_slow, d_out=learned_desc_dim)
+            d_d_router = learned_desc_dim
+        else:
+            self.desc_heads = DescriptorHeads(d_slow)
+            d_d_router = 4
+        # Sprint 4 #5 : continuous regime variant. Router → scalar θ,
+        # dynamics → cos-basis mixture over n_basis experts. Discards
+        # the discrete K-regime taxonomy entirely.
+        if continuous_regime:
+            self.router = ContinuousRegimeRouter(d_d=d_d_router,
+                                                  hidden=router_hidden)
+            self.dynamics = ContinuousRegimeDynamics(d_slow, n_basis=n_basis,
+                                                      stable=stable)
+        else:
+            self.router = RegimeRouter(
+                d_d=d_d_router, hidden=router_hidden, n_regimes=n_regimes,
+                temperature=router_temperature,
+                skip_connection=router_skip,
+                gumbel=router_gumbel, gumbel_hard=router_gumbel_hard,
+            )
+            self.dynamics = RegimeMixtureDynamics(
+                d_slow, n_regimes, stable=stable,
+                koopman=koopman, koopman_residual=koopman_residual,
+            )
         self.stable = stable
         self.koopman = koopman
         self.n_regimes = n_regimes
@@ -362,13 +532,31 @@ class RegimeWorldModel(nn.Module):
         """
         x : (T, d_in) raw observable trajectory
         Returns dict with z_fast, z_slow, d_dyn, r, z_slow_pred, x_recon
+
+        Per-timestep router (Sprint 3 #2) : si enabled, r est (T_s, n_regimes)
+        avec un router output par step à partir de descriptors calculés
+        sur une fenêtre glissante.
         """
         z_fast_enc = self.encoder(x)              # (T, D_fast)
         z_fast, z_slow = self.ssm(z_fast_enc)     # (T, D_fast), (T_s, D_slow)
-        d_dyn = self.desc_heads(z_slow)           # (4,)
-        r = self.router(d_dyn)                    # (3,)
-        z_slow_pred = self.dynamics(z_slow, r)    # (T_s, D_slow)
-        x_recon = self.decoder(z_fast_enc)        # (T, d_in)
+        if self.per_timestep_router:
+            T_s = z_slow.shape[0]
+            W = self.router_window
+            d_dyn_seq = []
+            r_seq = []
+            for t in range(T_s):
+                start = max(0, t - W + 1)
+                window = z_slow[start:t + 1]
+                d_t = self.desc_heads(window)
+                d_dyn_seq.append(d_t)
+                r_seq.append(self.router(d_t))
+            d_dyn = torch.stack(d_dyn_seq, dim=0)  # (T_s, d_d)
+            r = torch.stack(r_seq, dim=0)          # (T_s, n_regimes)
+        else:
+            d_dyn = self.desc_heads(z_slow)        # (d_d,)
+            r = self.router(d_dyn)                 # (n_regimes,)
+        z_slow_pred = self.dynamics(z_slow, r)     # (T_s, D_slow)
+        x_recon = self.decoder(z_fast_enc)         # (T, d_in)
         return {
             "z_fast": z_fast,
             "z_slow": z_slow,

@@ -35,6 +35,9 @@ class TrainConfig:
     n_starts_multistep: int = 4
     # Load balance loss (Shazeer 2017) for K > 3 MoE-style experts.
     w_load_balance: float = 0.0
+    # Sprint 4 #3 : differentiable Lyap regularization (Jacobian sigma_max).
+    w_lyap_reg: float = 0.0
+    lyap_targets: tuple = (0.9, 1.0, 1.0)  # per-regime σ_max target
 
 
 @dataclass
@@ -93,7 +96,10 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
         x = torch.from_numpy(sample.traj).float().to(device)
         x = (x - x.mean(0, keepdim=True)) / x.std(0, keepdim=True).clamp_min(1e-6)
         out = model(x)
-        regime_idx = REGIME_TO_IDX[sample.regime]
+        # Mixed-regime samples (Sprint 2 #4) ont sample.regime == "mixed" :
+        # pas de label trajectory-level. On force regime_idx=None pour
+        # désactiver le CE supervised à ce sample.
+        regime_idx = REGIME_TO_IDX.get(sample.regime, None)
         loss_dict = regime_conditional_loss(
             out, x,
             w_recon=1.0, w_dyn=weights["w_dyn"],
@@ -110,8 +116,18 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
             target_log_growth_chaotic=cfg.target_log_growth_chaotic,
             target_DET_periodic=cfg.target_DET_periodic,
         )
+        # Sprint 4 #3 : optional Lyap regularization term.
+        if cfg.w_lyap_reg > 0:
+            from .losses import loss_lyap_constraint
+            l_lyap_reg = loss_lyap_constraint(
+                model, out["z_slow"],
+                target_per_regime=cfg.lyap_targets, n_samples=2,
+            )
+            total_loss = loss_dict["total"] + cfg.w_lyap_reg * l_lyap_reg
+        else:
+            total_loss = loss_dict["total"]
         optim.zero_grad()
-        loss_dict["total"].backward()
+        total_loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optim.step()
 

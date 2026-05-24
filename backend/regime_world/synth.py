@@ -258,6 +258,129 @@ def make_dataset(n_per_regime: int = 24, T: int = 128, base_seed: int = 0
     return out
 
 
+@dataclass
+class MixedTrajSample:
+    """Mixed-regime sample : trajectoire qui transitionne entre régimes
+    mid-flow + per-step labels.
+
+    Sprint 2 #4 : test transitions router, vraie tâche multi-régime
+    contrairement aux samples mono-régime de TrajSample.
+    """
+    traj: np.ndarray              # (T, 3) — padded to 3D
+    regime_labels: np.ndarray     # (T,) — per-step regime index ∈ {0,1,2}
+    regime: str = "mixed"         # for backwards compat with eval code
+    lambda_true: float = 0.0
+    system_name: str = "mixed"
+    params: dict = None
+
+
+def gen_mixed_regime(T: int = 128, seed: int = 0,
+                      order: tuple = ("smooth", "periodic", "chaotic"),
+                      normalize_segments: bool = True) -> MixedTrajSample:
+    """Génère trajectoire qui passe par 3 régimes successifs.
+
+    Implementation : concatène 3 segments générés par 3 systèmes distincts,
+    normalise chacun (zero mean, unit std) pour que la jonction soit moins
+    brutale, pad à 3D.
+
+    T = total length. Segments de longueur ≈ T/3.
+    `order` : séquence des 3 régimes (peut être permutée pour test asymétrie).
+    """
+    rng = np.random.default_rng(seed)
+    GENS = {
+        "smooth": gen_damped_oscillator,
+        "periodic": gen_van_der_pol,
+        "chaotic": gen_lorenz,
+    }
+    seg_T = [T // 3, T // 3, T - 2 * (T // 3)]
+    segs = []
+    labels = []
+    for regime, sT in zip(order, seg_T):
+        sub_seed = int(rng.integers(0, 10**6))
+        sample = GENS[regime](T=sT, seed=sub_seed)
+        s = sample.traj
+        if s.shape[1] < 3:
+            s = np.concatenate([s, np.zeros((s.shape[0], 3 - s.shape[1]))], axis=1)
+        elif s.shape[1] > 3:
+            s = s[:, :3]
+        if normalize_segments:
+            s = (s - s.mean(0, keepdims=True)) / (s.std(0, keepdims=True).clip(1e-6))
+        segs.append(s)
+        labels.extend([REGIME_TO_IDX[regime]] * sT)
+    return MixedTrajSample(
+        traj=np.concatenate(segs, axis=0).astype(np.float32),
+        regime_labels=np.array(labels, dtype=np.int64),
+        regime="mixed",
+        lambda_true=0.0,
+        system_name=f"mixed_{'_'.join(order)}",
+        params={"order": order, "seg_T": seg_T},
+    )
+
+
+def make_mixed_dataset(n_samples: int = 32, T: int = 128, base_seed: int = 0,
+                        randomize_order: bool = True) -> list[MixedTrajSample]:
+    """N_samples trajectoires mixed-regime. randomize_order = chaque sample
+    a une permutation différente de (smooth, periodic, chaotic).
+    """
+    import itertools
+    orders = list(itertools.permutations(["smooth", "periodic", "chaotic"]))
+    out = []
+    rng = np.random.default_rng(base_seed)
+    for i in range(n_samples):
+        if randomize_order:
+            order = tuple(orders[rng.integers(0, len(orders))])
+        else:
+            order = ("smooth", "periodic", "chaotic")
+        out.append(gen_mixed_regime(T=T, seed=base_seed + i, order=order))
+    return out
+
+
+def make_harder_dataset(n_per_regime: int = 12, T: int = 128, base_seed: int = 0,
+                         noise_std: float = 0.10, mask_prob: float = 0.0,
+                         param_shift: bool = False) -> list[TrajSample]:
+    """Sprint 3 #4 : harder bench pour résoudre le floor effect.
+
+    Trois sources de difficulté :
+      - observation noise : gaussien additif (noise_std × std du signal)
+      - partial observability : masque aléatoire d'une dim avec proba mask_prob
+      - parameter shift : Lorenz ρ ∈ [40, 50] (vs train ρ=28),
+                          van der Pol μ ∈ [0.5, 0.8] (vs train μ=1.5)
+
+    L'objectif : empêcher tous les modèles d'atteindre MSE ~10⁻³ qui rend
+    la comparaison non-discriminante.
+    """
+    import numpy as _np
+    rng = _np.random.default_rng(base_seed)
+    out = []
+    seed = base_seed
+    for regime, gens in GENERATORS_PER_REGIME.items():
+        for i in range(n_per_regime):
+            gen = gens[i % len(gens)]
+            # Parameter shift for eval (OOD)
+            if param_shift:
+                if gen.__name__ == "gen_lorenz":
+                    rho_shift = float(rng.uniform(40, 50))
+                    s = gen(T=T, rho=rho_shift, seed=seed)
+                elif gen.__name__ == "gen_van_der_pol":
+                    mu_shift = float(rng.uniform(0.5, 0.8))
+                    s = gen(T=T, mu=mu_shift, seed=seed)
+                else:
+                    s = gen(T=T, seed=seed)
+            else:
+                s = gen(T=T, seed=seed)
+            # Observation noise
+            if noise_std > 0:
+                sigma = noise_std * s.traj.std()
+                s.traj = (s.traj + rng.normal(0, sigma, s.traj.shape)).astype(_np.float32)
+            # Partial observability
+            if mask_prob > 0 and rng.random() < mask_prob:
+                mask_dim = int(rng.integers(0, s.traj.shape[1]))
+                s.traj[:, mask_dim] = 0.0
+            out.append(s)
+            seed += 1
+    return out
+
+
 def split_train_eval(dataset: list[TrajSample], train_ratio: float = 0.8,
                      seed: int = 0) -> tuple[list, list]:
     rng = np.random.default_rng(seed)
