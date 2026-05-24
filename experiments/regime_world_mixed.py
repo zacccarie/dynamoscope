@@ -110,7 +110,7 @@ def make_eval_set(systems_dict, n_per_param=4, T=128, base_seed=10000):
 
 
 def eval_model_on_samples(model, samples, kind="rwm"):
-    mses, norms = [], []
+    mses, norms, latent_stds = [], [], []
     routers = []
     for s in samples:
         x = standardize_pad(s.traj)
@@ -119,12 +119,22 @@ def eval_model_on_samples(model, samples, kind="rwm"):
             mses.append(m["mse_1step"])
             norms.append(m["latent_norm"])
             routers.append(m["r"])
+            # Collapse diagnostic : z_slow variance across time
+            with torch.no_grad():
+                out = model(x)
+                z_slow = out["z_slow"]
+                latent_stds.append(float(z_slow.std(dim=0).mean().item()))
         else:
             m = flat_metrics(model, x)
             mses.append(m["mse_1step"])
             norms.append(m["latent_norm"])
+            with torch.no_grad():
+                out = model(x)
+                z = out["z_seq"]
+                latent_stds.append(float(z.std(dim=0).mean().item()))
     out = {"mse_mean": float(np.mean(mses)), "mse_std": float(np.std(mses)),
-           "norm_mean": float(np.mean(norms))}
+           "norm_mean": float(np.mean(norms)),
+           "latent_std_mean": float(np.mean(latent_stds))}
     if routers:
         r_arr = np.array(routers)
         out["router_mean"] = r_arr.mean(axis=0).tolist()
@@ -177,6 +187,8 @@ def run_one_seed(seed: int, n_per_regime=12, n_epochs=40, T=128):
                 "rwm_mse": rwm_m["mse_mean"], "flat_mse": flat_m["mse_mean"],
                 "rwm_router": rwm_m.get("router_mean", [0, 0, 0]),
                 "router_correct": router_correct,
+                "rwm_lstd": rwm_m["latent_std_mean"],
+                "flat_lstd": flat_m["latent_std_mean"],
             }
         print(f"  {sname:<14} ({info['regime']:<8})  IN  : "
               f"RWM={results[sname]['in_dist']['rwm_mse']:.4f}  "
@@ -199,11 +211,19 @@ def main():
     print("  Eval OOD     : same systems with ±parameter shifts")
     print("=" * 80)
 
+    import os
+    N_SEEDS = int(os.environ.get("RWM_N_SEEDS", "3"))
+    N_PER_REGIME = int(os.environ.get("RWM_N_PER_REGIME", "12"))
+    N_EPOCHS = int(os.environ.get("RWM_N_EPOCHS", "40"))
+    print(f"  config : N_SEEDS={N_SEEDS}  N_PER_REGIME={N_PER_REGIME}  "
+          f"N_EPOCHS={N_EPOCHS}")
+
     all_runs = []
     t0 = time.time()
-    for seed in range(3):
+    for seed in range(N_SEEDS):
         try:
-            all_runs.append(run_one_seed(seed))
+            all_runs.append(run_one_seed(seed, n_per_regime=N_PER_REGIME,
+                                          n_epochs=N_EPOCHS))
         except Exception as e:
             print(f"  seed {seed} failed : {e}")
             import traceback; traceback.print_exc()
@@ -218,8 +238,8 @@ def main():
     print("=" * 80)
 
     regime_acc = {"in_dist": [], "ood": []}
-    by_regime = {r: {"in_dist": {"rwm": [], "flat": []},
-                     "ood": {"rwm": [], "flat": []}}
+    by_regime = {r: {"in_dist": {"rwm": [], "flat": [], "rwm_lstd": [], "flat_lstd": []},
+                     "ood": {"rwm": [], "flat": [], "rwm_lstd": [], "flat_lstd": []}}
                  for r in ["smooth", "periodic", "chaotic"]}
 
     for run in all_runs:
@@ -228,16 +248,20 @@ def main():
             for dist in ["in_dist", "ood"]:
                 by_regime[reg][dist]["rwm"].append(sdata[dist]["rwm_mse"])
                 by_regime[reg][dist]["flat"].append(sdata[dist]["flat_mse"])
+                by_regime[reg][dist]["rwm_lstd"].append(sdata[dist].get("rwm_lstd", 0))
+                by_regime[reg][dist]["flat_lstd"].append(sdata[dist].get("flat_lstd", 0))
                 regime_acc[dist].append(sdata[dist]["router_correct"])
 
-    print(f"\n  {'Regime':<10}{'Dist':<10}{'RWM MSE':>14}{'Flat MSE':>14}{'Δ(R-F)':>14}{'R/F ratio':>12}")
+    print(f"\n  {'Regime':<10}{'Dist':<10}{'RWM MSE':>11}{'Flat MSE':>11}{'R/F':>8}{'RWM lstd':>10}{'Flat lstd':>10}")
     print("-" * 80)
     for reg in ["smooth", "periodic", "chaotic"]:
         for dist in ["in_dist", "ood"]:
             rwm_m = float(np.mean(by_regime[reg][dist]["rwm"]))
             flat_m = float(np.mean(by_regime[reg][dist]["flat"]))
             ratio = rwm_m / max(flat_m, 1e-9)
-            print(f"  {reg:<10}{dist:<10}{rwm_m:>14.5f}{flat_m:>14.5f}{rwm_m - flat_m:>+14.5f}{ratio:>12.2f}")
+            rlstd = float(np.mean(by_regime[reg][dist]["rwm_lstd"]))
+            flstd = float(np.mean(by_regime[reg][dist]["flat_lstd"]))
+            print(f"  {reg:<10}{dist:<10}{rwm_m:>11.5f}{flat_m:>11.5f}{ratio:>8.2f}{rlstd:>10.4f}{flstd:>10.4f}")
 
     print(f"\n  Router accuracy across all systems :")
     print(f"    IN-DIST : {np.mean(regime_acc['in_dist']):.3f}")
