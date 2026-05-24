@@ -33,6 +33,8 @@ class TrainConfig:
     K_multistep: int = 4
     gamma_multistep: float = 0.9
     n_starts_multistep: int = 4
+    # Load balance loss (Shazeer 2017) for K > 3 MoE-style experts.
+    w_load_balance: float = 0.0
 
 
 @dataclass
@@ -84,7 +86,7 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
     device = next(model.parameters()).device
     accum = {k: 0.0 for k in ["total", "recon", "dyn", "slow_weighted",
                               "recur_weighted", "lyap_weighted", "entropy_reg",
-                              "regime_sup", "multistep"]}
+                              "regime_sup", "multistep", "load_balance"]}
     rs_accum = [0.0, 0.0, 0.0]
     n = 0
     for sample in dataset:
@@ -102,6 +104,7 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
             K_multistep=cfg.K_multistep,
             gamma_multistep=cfg.gamma_multistep,
             n_starts_multistep=cfg.n_starts_multistep,
+            w_load_balance=cfg.w_load_balance,
             dynamics_module=model.dynamics,
             regime_idx=regime_idx,
             target_log_growth_chaotic=cfg.target_log_growth_chaotic,

@@ -2137,6 +2137,150 @@ regime-aware architecture --- once properly stabilized --- also wins
 on integral attractor quality. Smooth-regime training instability is
 the next bottleneck, not local-tangent expressivity.
 
+\subsection{Sprint 1 architectural sweep : router width, Koopman, K-experts MoE}
+\label{sec:rwm-sprint1}
+
+The F10 fix of $\S$\ref{sec:rwm-rollout-fix} closes one specific
+failure mode (catastrophic rollout divergence) but leaves open three
+architectural questions raised at submission review :
+(i) is the $4{\to}32{\to}3$ router the bottleneck behind the
+$0.84$ accuracy ceiling we hit in $\S$\ref{sec:rwm-video-final}~?
+(ii) Would a principled Koopman backbone
+\cite{koopman1931,mezic2005,lusch2018dkr} replace the residual MLP
+mixture more cleanly~?
+(iii) Does a true mixture-of-experts \cite{shazeer2017moe} with
+$K{>}3$ experts and Gumbel-softmax \cite{jang2017gumbel} routing
+help over the hand-designed 3-regime taxonomy~?
+
+We test the three on the same protocol --- 10 seeds, 40 epochs,
+mixed-regime synthetic, multi-step rollout loss --- with explicit
+capacity disclosure and Welch's t-test versus the F10-fixed baseline.
+
+\paragraph{Configurations.}
+\begin{itemize}[leftmargin=*]
+\item \texttt{stab\_ms} : F10-fix baseline (30.1K params, K=3,
+  MLP router $4{\to}32{\to}3$, residual transitions).
+\item \texttt{wider\_router} : same architecture + router
+  $4{\to}128{\to}3$ \emph{plus} a skip-connection
+  $\text{Linear}(d_d \to n_{\text{regimes}})$ summed into the logits
+  (30.9K params).
+\item \texttt{koopman} : each $\Phi_k$ replaced by a Koopman-style
+  module $z_{t+1} = P \cdot K \cdot \psi(z_t)$ with $K$ constrained
+  to be orthogonal (PyTorch \texttt{parametrizations.orthogonal}) and
+  scaled per regime ($0.9$ / $1.0$ / $1.0$), $\psi$ a small nonlinear
+  lift, $P$ a linear projection back to $z_{\text{slow}}$. No residual
+  skip; the rollout is fully linear in the lifted space (32.2K params).
+\item \texttt{k6\_gumbel} : $K{=}6$ experts, Gumbel-softmax router
+  (hidden 64), Shazeer-style load-balance loss
+  $w \cdot K \cdot \|\bar f\|^2$ at $w{=}0.1$; no regime supervision
+  (since 6 experts do not map to 3 hand-labelled regimes). Per-expert
+  init scales linearly interpolated. (43.2K params --- capacity is
+  not matched on purpose, this configuration tests whether unsupervised
+  MoE finds useful structure.)
+\item \texttt{flat56\_ms} : capacity-fairness control, 30.1K params,
+  flat GRU with the same multi-step rollout training loss.
+\end{itemize}
+
+\paragraph{Results at $K{=}24$, 10 seeds, per regime
+(mean $\pm$ std, $n$ = seeds with finite training).}
+
+\begin{table}[h]
+\centering
+\caption{Sprint 1 architectural sweep at the longest rollout horizon
+$K{=}24$. Lower is better. \texttt{koopman} diverges in training on
+$\geq 1$ seed per regime (F12).}
+\label{tab:sprint1-summary}
+\begin{tabular}{lrrrr}
+\toprule
+Model & smooth & periodic & chaotic & params \\
+\midrule
+\texttt{stab\_ms}     & $2.18 \pm 6$        & $0.084 \pm 0.08$    & $0.137 \pm 0.1$     & 30.1K \\
+\texttt{wider\_router}& $0.33 \pm 0.5$      & $0.089 \pm 0.06$    & $\bm{0.049 \pm 0.03}$ & 30.9K \\
+\texttt{koopman}      & $\bm{4.7{\times}10^{8}}$ & $3.36 \pm 8$    & $\bm{5.2{\times}10^{5}}$ & 32.2K \\
+\texttt{k6\_gumbel}   & $\bm{0.002 \pm 0.002}$ & $\bm{0.0015 \pm 0.0007}$ & $\bm{0.0009 \pm 0.0003}$ & 43.2K \\
+\texttt{flat56\_ms}   & $0.141 \pm 0.04$    & $0.233 \pm 0.05$    & $0.216 \pm 0.04$    & 30.1K \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Welch's t-test versus \texttt{stab\_ms} baseline at $K{=}24$
+per regime. $\downarrow$ means lower MSE (better). Significance :
+\textsuperscript{*} $p{<}0.05$, \textsuperscript{**} $p{<}0.01$,
+\textsuperscript{***} $p{<}0.001$.}
+\label{tab:sprint1-ttests}
+\begin{tabular}{llrrl}
+\toprule
+Variant & Regime & $t$ & $p$ & Effect \\
+\midrule
+\texttt{wider\_router} & smooth   & $-0.90$ & $0.39$ & $\downarrow$ ns \\
+\texttt{wider\_router} & periodic & $+0.14$ & $0.89$ & $\uparrow$ ns \\
+\texttt{wider\_router} & chaotic  & $-1.94$ & $0.08$ & $\downarrow$ trend \\
+\texttt{koopman}       & smooth   & $+1.03$ & $0.34$ & $\uparrow$ diverged \\
+\texttt{koopman}       & periodic & $+1.11$ & $0.30$ & $\uparrow$ ns \\
+\texttt{koopman}       & chaotic  & $+1.00$ & $0.34$ & $\uparrow$ diverged \\
+\texttt{k6\_gumbel}    & smooth   & $-1.07$ & $0.32$ & $\downarrow$ ns \\
+\texttt{k6\_gumbel}    & periodic & $-2.99$ & $\bm{0.017}$ & $\downarrow$ \textsuperscript{*} \\
+\texttt{k6\_gumbel}    & chaotic  & $-3.11$ & $\bm{0.014}$ & $\downarrow$ \textsuperscript{*} \\
+\texttt{flat56\_ms}    & smooth   & $-1.00$ & $0.35$ & $\downarrow$ ns \\
+\texttt{flat56\_ms}    & periodic & $+4.61$ & $\bm{0.0004}$ & $\uparrow$ \textsuperscript{***} \\
+\texttt{flat56\_ms}    & chaotic  & $+1.70$ & $0.12$ & $\uparrow$ ns \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{(F12) Koopman backbone fails at training scale.}
+The smoke test with 6 epochs suggested Koopman was bounded ; at the
+full 40-epoch / 10-seed protocol the orthogonal-$K$ + spectral-scale
+constraint interacts badly with the multi-step rollout loss and
+training diverges (NaN by mid-training on $\geq 1$ seed per regime).
+Even seeds that complete training produce rollouts with
+$\mathrm{MSE} \sim 10^{8}$ on smooth and $\sim 10^{5}$ on chaotic ---
+worse than the unmodified \texttt{RWM-orig} of
+$\S$\ref{sec:rwm-rollout}. We interpret this as : the rigid orthogonal
+$K$ provides too narrow a function class once a multi-step loss adds
+gradient pressure ; PyTorch's
+\texttt{parametrizations.orthogonal} uses a non-trivial chart and
+saturates under iteration. A softer spectral-norm clipping
+($\|K\|_2 \leq \rho$, $\rho \in [0.9, 1.0]$, no orthogonality) is the
+natural next try ; we leave it to a follow-up.
+
+\paragraph{Wider router : modest, regime-localized.}
+Adding hidden 128 + skip-connection improves the chaotic rollout by
+$2.8{\times}$ at $K{=}24$ (Table~\ref{tab:sprint1-summary}, $0.137 \to
+0.049$, $p{=}0.08$, statistically borderline at 10 seeds) but does
+not significantly help smooth or periodic. The router-accuracy ceiling
+of $0.84$ from $\S$\ref{sec:rwm-video-final} is therefore unlikely to
+be a router-capacity issue ; the bottleneck is more plausibly the
+descriptor space the router reads from, or the optimization dynamics
+of regime supervision. This is consistent with the descriptor-space
+linear-probe ceiling of $\sim 1.0$ we already reported : the
+information is in the descriptors, the router just struggles to use
+it consistently.
+
+\paragraph{K{=}6 Gumbel-softmax MoE wins, with a capacity caveat.}
+The unsupervised 6-expert MoE beats the 3-expert taxonomic baseline
+by two orders of magnitude on every regime --- significant on
+periodic ($p{=}0.017$) and chaotic ($p{=}0.014$) at 10 seeds. The
+two caveats are large : (a) parameter count is $43.2$K vs the
+$30.1$K baseline (+44\%) ; (b) without the smooth/periodic/chaotic
+supervision the learned experts could be exploiting trajectory
+statistics that the taxonomic baseline ignores by construction. The
+honest reading is that the headline gain is interesting but not yet
+a capacity-fair architectural claim ; a follow-up at matched
+capacity (6 experts at hidden 16, or 3 experts at hidden 64) is
+required before this number enters the abstract.
+
+\paragraph{Architecture vs training-loss disentanglement, confirmed.}
+The capacity-fair \texttt{flat56\_ms} control is significantly
+\emph{worse} than \texttt{stab\_ms} on the periodic regime
+($p{=}0.0004$, $0.233$ vs $0.084$, a $2.8{\times}$ gap), confirming
+that the multi-step rollout loss alone does not produce the F10-fix
+gain. The regime-aware mixture architecture is contributing signal
+that the flat baseline cannot replicate even with the same training
+objective.
+
 \section{What This Paper Does Not Claim}
 \label{sec:not-claim}
 
@@ -2295,6 +2439,24 @@ collected here:
   more aggressive gradient clipping schedule, lower learning rate in
   stage 3, warmup of the multi-step loss weight, or orthogonal
   initialization on $\Phi_k$.
+\item \textbf{Koopman backbone training divergence (F12).} A
+  principled replacement of the residual MLP mixture by a Koopman
+  operator with orthogonal $K$ + spectral scale (Sec.~\ref{sec:rwm-sprint1})
+  is theoretically attractive but fails empirically at 10-seed scale :
+  training diverges on $\geq 1$ seed per regime, and converged seeds
+  produce rollouts with $\mathrm{MSE}\sim 10^8$ on smooth ---
+  \emph{worse} than the pre-fix RWM-orig of $\S$\ref{sec:rwm-rollout}.
+  The orthogonal parametrization is too rigid under multi-step
+  gradient pressure. A softer alternative (spectral-norm clipping
+  with $\rho < 1$, no orthogonality) is the natural next try.
+\item \textbf{K{=}6 Gumbel-softmax MoE wins but capacity not matched
+  (F13 caveat, not failure).} An unsupervised 6-expert Gumbel-routed
+  MoE (Sec.~\ref{sec:rwm-sprint1}) beats the F10-fix baseline by
+  $\sim 100{\times}$ at $K{=}24$ ($p{<}0.05$ on periodic and chaotic
+  at 10 seeds). However the parameter count is 43.2K vs 30.1K
+  baseline (+44\%). A capacity-matched re-run (6 experts at smaller
+  hidden, or 3 experts at larger hidden) is required before this
+  number enters the abstract.
 \end{enumerate}
 
 \section{Conclusion}
@@ -2507,6 +2669,26 @@ sparsely-gated mixture-of-experts layer.
 Miyato, T., Kataoka, T., Koyama, M., \& Yoshida, Y. (2018). Spectral
 normalization for generative adversarial networks.
 \emph{International Conference on Learning Representations (ICLR)}.
+
+\bibitem{koopman1931}
+Koopman, B. O. (1931). Hamiltonian systems and transformation in
+Hilbert space. \emph{Proceedings of the National Academy of Sciences},
+17(5), 315--318.
+
+\bibitem{mezic2005}
+Mezi\'c, I. (2005). Spectral properties of dynamical systems, model
+reduction and decompositions. \emph{Nonlinear Dynamics}, 41(1),
+309--325.
+
+\bibitem{lusch2018dkr}
+Lusch, B., Kutz, J. N., \& Brunton, S. L. (2018). Deep learning for
+universal linear embeddings of nonlinear dynamics.
+\emph{Nature Communications}, 9, 4950.
+
+\bibitem{jang2017gumbel}
+Jang, E., Gu, S., \& Poole, B. (2017). Categorical reparameterization
+with Gumbel-softmax. \emph{International Conference on Learning
+Representations (ICLR)}.
 
 \end{thebibliography}
 

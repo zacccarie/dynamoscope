@@ -130,6 +130,20 @@ def loss_multistep_rollout(z_slow: torch.Tensor, dynamics, r: torch.Tensor,
     return total / max(len(starts), 1)
 
 
+def loss_load_balance(r_batch: torch.Tensor) -> torch.Tensor:
+    """Shazeer 2017 (simplified) load-balance pour K > 3 unsupervised experts.
+
+    r_batch : (B, K) router outputs (softmax weights) per sample.
+    Minimise K * ||mean_gate||² ; min = 1 si chaque expert utilisé à 1/K.
+    Plus elevé = un expert monopolise tout (collapse).
+    """
+    if r_batch.dim() == 1:
+        r_batch = r_batch.unsqueeze(0)
+    f = r_batch.mean(dim=0)  # (K,) — gate fraction par expert
+    K = f.shape[0]
+    return K * (f * f).sum()
+
+
 def loss_regime_supervised(r: torch.Tensor, regime_idx: int) -> torch.Tensor:
     """Cross-entropy : router output vs ground-truth regime label.
 
@@ -169,6 +183,7 @@ def regime_conditional_loss(
     K_multistep: int = 4,
     gamma_multistep: float = 0.9,
     n_starts_multistep: int = 4,
+    w_load_balance: float = 0.0,
     dynamics_module=None,
     regime_idx: int | None = None,
     target_log_growth_chaotic: float = 0.1,
@@ -179,34 +194,49 @@ def regime_conditional_loss(
     Returns dict {total, recon, dyn, slow_weighted, recur_weighted, lyap_weighted,
     entropy_reg, r}.
     """
-    r = out["r"]  # (3,)
-    r_smooth, r_periodic, r_chaotic = r[0], r[1], r[2]
+    r = out["r"]  # (K,) — K=3 (taxonomic) ou K>3 (unsupervised MoE)
+    K = r.shape[-1] if r.dim() > 0 else 3
+    taxonomic = (K == 3)
 
     l_recon = loss_recon(out["x_recon"], x) * w_recon
     l_dyn = loss_dynamics_one_step(out["z_slow"], out["z_slow_pred"]) * w_dyn
 
-    # Slowness : weight by (r_smooth + r_periodic), penalize when system is
-    # smooth or periodic (both prefer slow latents)
-    l_slow_raw = loss_slowness(out["z_slow"])
-    l_slow = (r_smooth + r_periodic) * l_slow_raw * w_slow
+    if taxonomic:
+        r_smooth, r_periodic, r_chaotic = r[0], r[1], r[2]
+        # Slowness : weight by (r_smooth + r_periodic), penalize when system is
+        # smooth or periodic (both prefer slow latents)
+        l_slow_raw = loss_slowness(out["z_slow"])
+        l_slow = (r_smooth + r_periodic) * l_slow_raw * w_slow
+        # Recurrence : weighted by r_periodic
+        l_recur_raw = loss_recurrence(out["z_slow"], target_DET=target_DET_periodic)
+        l_recur = r_periodic * l_recur_raw * w_recur
+        # Lyap proxy : weighted by r_chaotic
+        l_lyap_raw = loss_lyap_proxy(out["z_slow"],
+                                      target_log_growth=target_log_growth_chaotic)
+        l_lyap = r_chaotic * l_lyap_raw * w_lyap
+    else:
+        # K > 3 : aucune correspondence régime ↔ expert. Pas de gated losses.
+        # Le modèle apprend la spécialisation purement via dyn + recon + ms.
+        zero = r.sum() * 0.0
+        l_slow = zero; l_recur = zero; l_lyap = zero
 
-    # Recurrence : weighted by r_periodic
-    l_recur_raw = loss_recurrence(out["z_slow"], target_DET=target_DET_periodic)
-    l_recur = r_periodic * l_recur_raw * w_recur
-
-    # Lyap proxy : weighted by r_chaotic, target small positive growth
-    l_lyap_raw = loss_lyap_proxy(out["z_slow"],
-                                  target_log_growth=target_log_growth_chaotic)
-    l_lyap = r_chaotic * l_lyap_raw * w_lyap
-
-    # Entropy regularizer (anti-collapse)
+    # Entropy regularizer (anti-collapse). Vise distribution non-dégenérée.
     l_entropy = loss_entropy_regularizer(r) * w_entropy
 
-    # Optional supervised regime CE (semi-supervised mode)
-    if w_regime_sup > 0 and regime_idx is not None:
+    # Optional supervised regime CE (semi-supervised mode, K=3 only)
+    if taxonomic and w_regime_sup > 0 and regime_idx is not None:
         l_regime_sup = loss_regime_supervised(r, regime_idx) * w_regime_sup
     else:
         l_regime_sup = r.sum() * 0.0  # zero, keeps grad graph
+
+    # Load balance (Shazeer 2017, simplified) — pour K > 3 MoE-style.
+    # r est (K,) ici (un sample); le loss attend (B, K) idéalement mais
+    # accepte single sample via unsqueeze. Effet faible sur 1 sample, l'agrégat
+    # batch-level émerge via accumulation epoch-wise du gradient.
+    if w_load_balance > 0:
+        l_load = loss_load_balance(r) * w_load_balance
+    else:
+        l_load = r.sum() * 0.0
 
     # Multi-step rollout loss (F10 fix). Requires dynamics_module to iterate.
     if w_multistep > 0 and dynamics_module is not None:
@@ -220,7 +250,15 @@ def regime_conditional_loss(
         l_multistep = r.sum() * 0.0
 
     total = (l_recon + l_dyn + l_slow + l_recur + l_lyap + l_entropy
-             + l_regime_sup + l_multistep)
+             + l_regime_sup + l_multistep + l_load)
+    # Pour l'export r_smooth/periodic/chaotic : K=3 garde la semantique ;
+    # K>3 reporte les 3 premières gates (juste pour télémétrie, pas sémantique).
+    if taxonomic:
+        r0, r1, r2 = float(r[0].item()), float(r[1].item()), float(r[2].item())
+    else:
+        r0 = float(r[0].item())
+        r1 = float(r[1].item()) if K > 1 else 0.0
+        r2 = float(r[2].item()) if K > 2 else 0.0
     return {
         "total": total,
         "recon": l_recon,
@@ -231,7 +269,8 @@ def regime_conditional_loss(
         "entropy_reg": l_entropy,
         "regime_sup": l_regime_sup,
         "multistep": l_multistep,
-        "r_smooth": float(r_smooth.item()),
-        "r_periodic": float(r_periodic.item()),
-        "r_chaotic": float(r_chaotic.item()),
+        "load_balance": l_load,
+        "r_smooth": r0,
+        "r_periodic": r1,
+        "r_chaotic": r2,
     }

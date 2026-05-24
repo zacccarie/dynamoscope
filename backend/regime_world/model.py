@@ -134,23 +134,43 @@ class DescriptorHeads(nn.Module):
 
 
 class RegimeRouter(nn.Module):
-    """MLP(d_dyn) → softmax over 3 regimes.
+    """MLP(d_dyn) → softmax over n_regimes.
+
+    Variantes (Sprint 1 architectural sweep) :
+      - hidden : largeur de la hidden layer (32 défaut, 128 = wider)
+      - skip_connection : adds direct Linear(d_d → n_regimes) bypassant hidden
+      - gumbel : forward returns Gumbel-softmax (differentiable hard routing,
+        utile pour K > 3 experts MoE-style)
+      - gumbel_hard : straight-through trick si gumbel=True
 
     Anti-collapse : entropy regularizer added in loss.
     """
 
     def __init__(self, d_d: int = 4, hidden: int = 32, n_regimes: int = 3,
-                 temperature: float = 1.0):
+                 temperature: float = 1.0, skip_connection: bool = False,
+                 gumbel: bool = False, gumbel_hard: bool = False):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(d_d, hidden), nn.SiLU(),
             nn.Linear(hidden, n_regimes),
         )
+        self.skip_connection = skip_connection
+        if skip_connection:
+            # Direct linear path : d_d → n_regimes, somme aux logits du MLP.
+            self.skip = nn.Linear(d_d, n_regimes)
         self.temperature = temperature
+        self.gumbel = gumbel
+        self.gumbel_hard = gumbel_hard
+        self.n_regimes = n_regimes
 
     def forward(self, d_dyn: torch.Tensor) -> torch.Tensor:
         logits = self.net(d_dyn)
-        return F.softmax(logits / self.temperature, dim=-1)
+        if self.skip_connection:
+            logits = logits + self.skip(d_dyn)
+        logits = logits / self.temperature
+        if self.gumbel and self.training:
+            return F.gumbel_softmax(logits, hard=self.gumbel_hard, dim=-1)
+        return F.softmax(logits, dim=-1)
 
 
 class TransitionModule(nn.Module):
@@ -251,13 +271,24 @@ class RegimeMixtureDynamics(nn.Module):
                  stable: bool = False, koopman: bool = False,
                  koopman_residual: bool = False):
         super().__init__()
-        # Inductive biases per regime :
+        # Inductive biases per regime (n_regimes=3 case = labelled, taxonomic) :
         #   smooth   : small delta (init small / small delta_scale / contract)
         #   periodic : medium with rotational tendency (rotate)
         #   chaotic  : larger delta (mais toujours bornée si stable=True / chaos)
-        scales = [0.3, 0.6, 1.0]
-        delta_scales = [0.1, 0.3, 0.5]
-        koopman_modes = ["contract", "rotate", "chaos"]
+        # Pour K > 3 (MoE-style unsupervised) : interpolate scales linspace.
+        if n_regimes == 3:
+            scales = [0.3, 0.6, 1.0]
+            delta_scales = [0.1, 0.3, 0.5]
+            koopman_modes = ["contract", "rotate", "chaos"]
+        else:
+            # Spread experts across stability spectrum.
+            import numpy as _np
+            scales = _np.linspace(0.3, 1.0, n_regimes).tolist()
+            delta_scales = _np.linspace(0.1, 0.5, n_regimes).tolist()
+            # Distribute mode types roughly evenly.
+            koopman_modes = [
+                ["contract", "rotate", "chaos"][k % 3] for k in range(n_regimes)
+            ]
         if koopman:
             self.transitions = nn.ModuleList([
                 KoopmanTransitionModule(
@@ -273,6 +304,7 @@ class RegimeMixtureDynamics(nn.Module):
                                   stable=stable, delta_scale=delta_scales[k])
                 for k in range(n_regimes)
             ])
+        self.n_regimes = n_regimes
 
     def forward(self, z_slow: torch.Tensor, r: torch.Tensor) -> torch.Tensor:
         """
@@ -297,19 +329,26 @@ class RegimeWorldModel(nn.Module):
     def __init__(self, d_in: int = 3, d_fast: int = 32, d_slow: int = 32,
                  slow_stride: int = 4, n_regimes: int = 3,
                  router_temperature: float = 1.0, stable: bool = False,
-                 koopman: bool = False, koopman_residual: bool = False):
+                 koopman: bool = False, koopman_residual: bool = False,
+                 router_hidden: int = 32, router_skip: bool = False,
+                 router_gumbel: bool = False, router_gumbel_hard: bool = False):
         super().__init__()
         self.encoder = PerceptualEncoder(d_in, d_fast)
         self.ssm = FastSlowSSM(d_fast, d_slow, slow_stride)
         self.desc_heads = DescriptorHeads(d_slow)
-        self.router = RegimeRouter(d_d=4, n_regimes=n_regimes,
-                                    temperature=router_temperature)
+        self.router = RegimeRouter(
+            d_d=4, hidden=router_hidden, n_regimes=n_regimes,
+            temperature=router_temperature,
+            skip_connection=router_skip,
+            gumbel=router_gumbel, gumbel_hard=router_gumbel_hard,
+        )
         self.dynamics = RegimeMixtureDynamics(
             d_slow, n_regimes, stable=stable,
             koopman=koopman, koopman_residual=koopman_residual,
         )
         self.stable = stable
         self.koopman = koopman
+        self.n_regimes = n_regimes
         self.d_in = d_in
         self.d_fast = d_fast
         self.d_slow = d_slow
