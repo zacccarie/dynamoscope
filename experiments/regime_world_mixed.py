@@ -163,13 +163,21 @@ def run_one_seed(seed: int, n_per_regime=12, n_epochs=40, T=128):
     t_rwm = time.time() - ts
     print(f"  RWM trained ({t_rwm:.1f}s)")
 
-    # Train flat
+    # Train flat baseline (small, d_h=32, 12K params)
     torch.manual_seed(seed); np.random.seed(seed)
     base = FlatBaseline(d_in=3, d_h=32)
     ts = time.time()
     train_baseline(base, train_ds, n_epochs=n_epochs)
     t_base = time.time() - ts
-    print(f"  Flat trained ({t_base:.1f}s)")
+    print(f"  Flat-32 trained ({t_base:.1f}s)")
+
+    # Train flat baseline (matched capacity, d_h=56, ~30K params = RWM size)
+    torch.manual_seed(seed); np.random.seed(seed)
+    base_lg = FlatBaseline(d_in=3, d_h=56)
+    ts = time.time()
+    train_baseline(base_lg, train_ds, n_epochs=n_epochs)
+    t_base_lg = time.time() - ts
+    print(f"  Flat-56 (matched 30K params) trained ({t_base_lg:.1f}s)")
 
     # Eval per system per distribution
     results = {}
@@ -179,25 +187,27 @@ def run_one_seed(seed: int, n_per_regime=12, n_epochs=40, T=128):
             samples = eval_set[dist][sname]
             rwm_m = eval_model_on_samples(rwm, samples, kind="rwm")
             flat_m = eval_model_on_samples(base, samples, kind="flat")
-            # Router accuracy (RWM)
+            flat_lg_m = eval_model_on_samples(base_lg, samples, kind="flat")
             regime_true = REGIME_TO_IDX[info["regime"]]
             r_arr = np.array(rwm_m.get("router_mean", [0, 0, 0]))
             router_correct = int(np.argmax(r_arr) == regime_true)
             results[sname][dist] = {
                 "rwm_mse": rwm_m["mse_mean"], "flat_mse": flat_m["mse_mean"],
+                "flat_lg_mse": flat_lg_m["mse_mean"],
                 "rwm_router": rwm_m.get("router_mean", [0, 0, 0]),
                 "router_correct": router_correct,
                 "rwm_lstd": rwm_m["latent_std_mean"],
                 "flat_lstd": flat_m["latent_std_mean"],
+                "flat_lg_lstd": flat_lg_m["latent_std_mean"],
             }
         print(f"  {sname:<14} ({info['regime']:<8})  IN  : "
               f"RWM={results[sname]['in_dist']['rwm_mse']:.4f}  "
-              f"Flat={results[sname]['in_dist']['flat_mse']:.4f}  "
-              f"r_arg={np.argmax(results[sname]['in_dist']['rwm_router'])}")
+              f"F32={results[sname]['in_dist']['flat_mse']:.4f}  "
+              f"F56={results[sname]['in_dist']['flat_lg_mse']:.4f}")
         print(f"  {' ':<14}             OOD : "
               f"RWM={results[sname]['ood']['rwm_mse']:.4f}  "
-              f"Flat={results[sname]['ood']['flat_mse']:.4f}  "
-              f"r_arg={np.argmax(results[sname]['ood']['rwm_router'])}")
+              f"F32={results[sname]['ood']['flat_mse']:.4f}  "
+              f"F56={results[sname]['ood']['flat_lg_mse']:.4f}")
 
     return {"seed": seed, "results": results}
 
@@ -238,8 +248,10 @@ def main():
     print("=" * 80)
 
     regime_acc = {"in_dist": [], "ood": []}
-    by_regime = {r: {"in_dist": {"rwm": [], "flat": [], "rwm_lstd": [], "flat_lstd": []},
-                     "ood": {"rwm": [], "flat": [], "rwm_lstd": [], "flat_lstd": []}}
+    by_regime = {r: {"in_dist": {"rwm": [], "flat": [], "flat_lg": [],
+                                  "rwm_lstd": [], "flat_lstd": []},
+                     "ood": {"rwm": [], "flat": [], "flat_lg": [],
+                              "rwm_lstd": [], "flat_lstd": []}}
                  for r in ["smooth", "periodic", "chaotic"]}
 
     for run in all_runs:
@@ -248,47 +260,54 @@ def main():
             for dist in ["in_dist", "ood"]:
                 by_regime[reg][dist]["rwm"].append(sdata[dist]["rwm_mse"])
                 by_regime[reg][dist]["flat"].append(sdata[dist]["flat_mse"])
+                by_regime[reg][dist]["flat_lg"].append(sdata[dist].get("flat_lg_mse", 0))
                 by_regime[reg][dist]["rwm_lstd"].append(sdata[dist].get("rwm_lstd", 0))
                 by_regime[reg][dist]["flat_lstd"].append(sdata[dist].get("flat_lstd", 0))
                 regime_acc[dist].append(sdata[dist]["router_correct"])
 
-    print(f"\n  {'Regime':<10}{'Dist':<10}{'RWM MSE':>11}{'Flat MSE':>11}{'R/F':>8}{'RWM lstd':>10}{'Flat lstd':>10}")
+    print(f"\n  {'Regime':<10}{'Dist':<8}{'RWM MSE':>10}{'F32 MSE':>10}{'F56 MSE':>10}{'R/F32':>8}{'R/F56':>8}")
     print("-" * 80)
     for reg in ["smooth", "periodic", "chaotic"]:
         for dist in ["in_dist", "ood"]:
             rwm_m = float(np.mean(by_regime[reg][dist]["rwm"]))
             flat_m = float(np.mean(by_regime[reg][dist]["flat"]))
-            ratio = rwm_m / max(flat_m, 1e-9)
-            rlstd = float(np.mean(by_regime[reg][dist]["rwm_lstd"]))
-            flstd = float(np.mean(by_regime[reg][dist]["flat_lstd"]))
-            print(f"  {reg:<10}{dist:<10}{rwm_m:>11.5f}{flat_m:>11.5f}{ratio:>8.2f}{rlstd:>10.4f}{flstd:>10.4f}")
+            flat_lg = float(np.mean(by_regime[reg][dist]["flat_lg"]))
+            ratio_s = rwm_m / max(flat_m, 1e-9)
+            ratio_l = rwm_m / max(flat_lg, 1e-9)
+            print(f"  {reg:<10}{dist:<8}{rwm_m:>10.5f}{flat_m:>10.5f}{flat_lg:>10.5f}{ratio_s:>8.2f}{ratio_l:>8.2f}")
 
     print(f"\n  Router accuracy across all systems :")
     print(f"    IN-DIST : {np.mean(regime_acc['in_dist']):.3f}")
     print(f"    OOD     : {np.mean(regime_acc['ood']):.3f}")
 
-    # H1 test : RWM better OOD than Flat overall?
+    # H1 tests : RWM better OOD than (Flat-32) AND (Flat-56 matched)?
     rwm_ood_all = sum([by_regime[r]["ood"]["rwm"] for r in by_regime], [])
     flat_ood_all = sum([by_regime[r]["ood"]["flat"] for r in by_regime], [])
-    ratio_ood = np.mean(rwm_ood_all) / max(np.mean(flat_ood_all), 1e-9)
-    print(f"\n  Global OOD ratio (RWM/Flat) : {ratio_ood:.2f}")
-    if ratio_ood < 0.9:
-        print(f"  ✓ H1 SUPPORTED : RWM-sup beats Flat OOD")
-    elif ratio_ood < 1.1:
-        print(f"  ≈ H1 NEUTRAL : RWM ≈ Flat OOD")
+    flat_lg_ood_all = sum([by_regime[r]["ood"]["flat_lg"] for r in by_regime], [])
+    ratio_s = np.mean(rwm_ood_all) / max(np.mean(flat_ood_all), 1e-9)
+    ratio_l = np.mean(rwm_ood_all) / max(np.mean(flat_lg_ood_all), 1e-9)
+    print(f"\n  Global OOD ratios :")
+    print(f"    RWM / Flat-32 (12K params) : {ratio_s:.2f}")
+    print(f"    RWM / Flat-56 (30K params, matched) : {ratio_l:.2f}")
+    if ratio_l < 0.9:
+        print(f"  ✓ H1 ARCHITECTURE WINS : RWM beats matched-param Flat OOD")
+    elif ratio_l < 1.1:
+        print(f"  ≈ H1 CAPACITY-EXPLAINED : RWM ≈ matched Flat OOD (gain from capacity, not arch)")
     else:
-        print(f"  ✗ H1 REJECTED : RWM worse OOD than Flat")
+        print(f"  ✗ H1 REJECTED : RWM worse than matched Flat OOD")
 
     Path("results").mkdir(exist_ok=True)
     out = {
         "all_runs": all_runs,
         "by_regime": {r: {d: {"rwm_mean": float(np.mean(by_regime[r][d]["rwm"])),
-                              "flat_mean": float(np.mean(by_regime[r][d]["flat"]))}
+                              "flat_mean": float(np.mean(by_regime[r][d]["flat"])),
+                              "flat_lg_mean": float(np.mean(by_regime[r][d]["flat_lg"]))}
                           for d in ["in_dist", "ood"]}
                        for r in ["smooth", "periodic", "chaotic"]},
         "router_acc_in_dist": float(np.mean(regime_acc["in_dist"])),
         "router_acc_ood": float(np.mean(regime_acc["ood"])),
-        "h1_ratio": float(ratio_ood),
+        "h1_ratio_vs_flat32": float(ratio_s),
+        "h1_ratio_vs_flat56_matched": float(ratio_l),
     }
     def _d(o):
         if isinstance(o, (np.bool_, bool)): return bool(o)
