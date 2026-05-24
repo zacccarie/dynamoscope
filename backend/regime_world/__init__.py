@@ -5,7 +5,8 @@ State : (z_fast, z_slow, d_dyn, r) over {smooth, periodic, chaotic}.
 """
 from .model import (
     RegimeWorldModel, PerceptualEncoder, FastSlowSSM, DescriptorHeads,
-    RegimeRouter, RegimeMixtureDynamics, TransitionModule, REGIMES,
+    RegimeRouter, RegimeMixtureDynamics, TransitionModule,
+    KoopmanTransitionModule, REGIMES,
 )
 from .losses import regime_conditional_loss
 from .trainer import TrainConfig, train, encode_eval
@@ -16,7 +17,8 @@ from .synth import (
 
 __all__ = [
     "RegimeWorldModel", "PerceptualEncoder", "FastSlowSSM", "DescriptorHeads",
-    "RegimeRouter", "RegimeMixtureDynamics", "TransitionModule", "REGIMES",
+    "RegimeRouter", "RegimeMixtureDynamics", "TransitionModule",
+    "KoopmanTransitionModule", "REGIMES",
     "regime_conditional_loss",
     "TrainConfig", "train", "encode_eval",
     "make_dataset", "split_train_eval", "TrajSample", "REGIME_TO_IDX",

@@ -92,6 +92,44 @@ def loss_lyap_proxy(z_slow: torch.Tensor, tau: int = 3,
     return (log_growth - target_log_growth) ** 2
 
 
+def loss_multistep_rollout(z_slow: torch.Tensor, dynamics, r: torch.Tensor,
+                            K: int = 4, gamma: float = 0.9,
+                            n_starts: int = 4) -> torch.Tensor:
+    """K-step rollout loss : itérer dynamics K fois et matcher futur z_slow.
+
+    Addresses F10 : 1-step training ne contraint pas la stabilité long horizon.
+    Pick `n_starts` random offsets in z_slow, roll out K steps from each,
+    compare predicted to ground truth with γ^k discount.
+
+    z_slow : (T_s, D_slow) ground-truth latents
+    dynamics : RegimeMixtureDynamics instance
+    r : (3,) regime distribution from router
+    K : rollout horizon
+    gamma : discount per step (≤ 1, late steps weighted less to stabilize grad)
+    n_starts : how many random start points per sample
+    """
+    T_s = z_slow.shape[0]
+    if T_s < K + 2:
+        return z_slow.sum() * 0.0
+    max_start = T_s - K - 1
+    # Determinist starts if max_start small; otherwise random
+    if max_start <= n_starts:
+        starts = list(range(max_start + 1))
+    else:
+        starts = torch.randint(0, max_start + 1, (n_starts,)).tolist()
+    total = z_slow.sum() * 0.0
+    for start in starts:
+        z_pred = z_slow[start].unsqueeze(0)  # (1, D)
+        loss_chain = z_slow.sum() * 0.0
+        for k in range(K):
+            z_pred = dynamics(z_pred, r)  # (1, D)
+            target = z_slow[start + 1 + k].unsqueeze(0).detach()
+            step_loss = ((z_pred - target) ** 2).mean()
+            loss_chain = loss_chain + (gamma ** k) * step_loss
+        total = total + loss_chain / K
+    return total / max(len(starts), 1)
+
+
 def loss_regime_supervised(r: torch.Tensor, regime_idx: int) -> torch.Tensor:
     """Cross-entropy : router output vs ground-truth regime label.
 
@@ -127,6 +165,11 @@ def regime_conditional_loss(
     w_lyap: float = 1.0,
     w_entropy: float = 0.1,
     w_regime_sup: float = 0.0,
+    w_multistep: float = 0.0,
+    K_multistep: int = 4,
+    gamma_multistep: float = 0.9,
+    n_starts_multistep: int = 4,
+    dynamics_module=None,
     regime_idx: int | None = None,
     target_log_growth_chaotic: float = 0.1,
     target_DET_periodic: float = 0.7,
@@ -165,7 +208,19 @@ def regime_conditional_loss(
     else:
         l_regime_sup = r.sum() * 0.0  # zero, keeps grad graph
 
-    total = l_recon + l_dyn + l_slow + l_recur + l_lyap + l_entropy + l_regime_sup
+    # Multi-step rollout loss (F10 fix). Requires dynamics_module to iterate.
+    if w_multistep > 0 and dynamics_module is not None:
+        l_multistep_raw = loss_multistep_rollout(
+            out["z_slow"], dynamics_module, r,
+            K=K_multistep, gamma=gamma_multistep,
+            n_starts=n_starts_multistep,
+        )
+        l_multistep = w_multistep * l_multistep_raw
+    else:
+        l_multistep = r.sum() * 0.0
+
+    total = (l_recon + l_dyn + l_slow + l_recur + l_lyap + l_entropy
+             + l_regime_sup + l_multistep)
     return {
         "total": total,
         "recon": l_recon,
@@ -175,6 +230,7 @@ def regime_conditional_loss(
         "lyap_weighted": l_lyap,
         "entropy_reg": l_entropy,
         "regime_sup": l_regime_sup,
+        "multistep": l_multistep,
         "r_smooth": float(r_smooth.item()),
         "r_periodic": float(r_periodic.item()),
         "r_chaotic": float(r_chaotic.item()),

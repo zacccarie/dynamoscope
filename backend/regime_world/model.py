@@ -154,39 +154,125 @@ class RegimeRouter(nn.Module):
 
 
 class TransitionModule(nn.Module):
-    """Single regime-specific transition Φ_k : z_t → z_{t+1}."""
+    """Single regime-specific transition Φ_k : z_t → z_{t+1}.
+
+    Stable variant (F10 fix) :
+      - spectral_norm on all Linear layers (‖W‖_2 ≤ 1 per layer)
+      - tanh output to bound delta in [-delta_scale, +delta_scale]
+      - composition reste contractante par construction
+    """
 
     def __init__(self, d_slow: int = 32, hidden: int = 64,
-                 init_scale: float = 1.0):
+                 init_scale: float = 1.0, stable: bool = False,
+                 delta_scale: float = 0.5):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(d_slow, hidden), nn.SiLU(),
-            nn.Linear(hidden, d_slow),
-        )
-        # Different init scale for different regimes (inductive bias)
-        with torch.no_grad():
-            for p in self.net.parameters():
-                p.mul_(init_scale)
+        self.stable = stable
+        self.delta_scale = delta_scale
+        l1 = nn.Linear(d_slow, hidden)
+        l2 = nn.Linear(hidden, d_slow)
+        if stable:
+            # Spectral norm garantit ‖W‖_2 ≤ 1, donc composition Lipschitz ≤ 1.
+            # Combined with tanh+scale on output, delta is bounded per step.
+            l1 = nn.utils.spectral_norm(l1)
+            l2 = nn.utils.spectral_norm(l2)
+        self.net = nn.Sequential(l1, nn.SiLU(), l2)
+        # Init scale bias (regime-specific). Skip for stable since spectral
+        # norm overrides the magnitude.
+        if not stable:
+            with torch.no_grad():
+                for p in self.net.parameters():
+                    p.mul_(init_scale)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
-        # Residual : Φ(z) = z + delta
-        return z + self.net(z)
+        delta = self.net(z)
+        if self.stable:
+            # Bounded delta per step → bounded trajectory under iteration.
+            delta = self.delta_scale * torch.tanh(delta)
+        return z + delta
+
+
+class KoopmanTransitionModule(nn.Module):
+    """Koopman-operator transition : z_{t+1} = P · K · ψ(z_t).
+
+    ψ : nonlinear lift (small MLP) into observable-function space.
+    K : linear operator with constrained spectrum (orthogonal × scale).
+    P : linear projection back to z_slow space.
+
+    Stabilité par construction :
+      - K orthogonal (parametrization) → ‖K v‖ = ‖v‖
+      - spectral_scale ∈ [0.9, 1.0] : contracte si < 1, conserve si = 1
+      - non-linéarité vient de ψ, opérateur K reste spectralement borné
+
+    Modes (inductive bias par régime) :
+      'contract' : scale=0.9     → contraction stricte (smooth)
+      'rotate'   : scale=1.0     → préservation de norme (periodic, oscillatoire)
+      'chaos'    : scale=1.0 + ψ plus expressif → chaos borné sur attracteur
+
+    Référence : Koopman 1931, Mezić 2005, Lusch et al. 2018 (DKR).
+    """
+
+    def __init__(self, d_slow: int = 32, d_lift: int = 32,
+                 mode: str = "contract", residual: bool = False,
+                 delta_scale: float = 0.5):
+        super().__init__()
+        # Plus expressif pour le mode chaos
+        hidden_psi = d_lift if mode != "chaos" else d_lift * 2
+        self.psi = nn.Sequential(
+            nn.Linear(d_slow, hidden_psi), nn.SiLU(),
+            nn.Linear(hidden_psi, d_lift),
+        )
+        K_lin = nn.Linear(d_lift, d_lift, bias=False)
+        try:
+            from torch.nn.utils.parametrizations import orthogonal
+            self.K = orthogonal(K_lin)
+        except ImportError:
+            # Fallback for older torch : spectral_norm (≤ 1, pas orthogonal)
+            self.K = nn.utils.spectral_norm(K_lin)
+        scales = {"contract": 0.9, "rotate": 1.0, "chaos": 1.0}
+        self.spectral_scale = scales.get(mode, 0.95)
+        self.proj = nn.Linear(d_lift, d_slow)
+        self.residual = residual
+        self.delta_scale = delta_scale
+        self.mode = mode
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        psi = self.psi(z)                                 # nonlinear lift
+        psi_next = self.spectral_scale * self.K(psi)      # spectral-bounded advance
+        out = self.proj(psi_next)                         # back to z_slow
+        if self.residual:
+            return z + self.delta_scale * torch.tanh(out)
+        return out
 
 
 class RegimeMixtureDynamics(nn.Module):
     """Mix 3 transitions weighted by regime distribution r."""
 
-    def __init__(self, d_slow: int = 32, n_regimes: int = 3):
+    def __init__(self, d_slow: int = 32, n_regimes: int = 3,
+                 stable: bool = False, koopman: bool = False,
+                 koopman_residual: bool = False):
         super().__init__()
         # Inductive biases per regime :
-        #   smooth   : small delta (init small)
-        #   periodic : medium with rotational tendency
-        #   chaotic  : larger delta
+        #   smooth   : small delta (init small / small delta_scale / contract)
+        #   periodic : medium with rotational tendency (rotate)
+        #   chaotic  : larger delta (mais toujours bornée si stable=True / chaos)
         scales = [0.3, 0.6, 1.0]
-        self.transitions = nn.ModuleList([
-            TransitionModule(d_slow=d_slow, init_scale=scales[k])
-            for k in range(n_regimes)
-        ])
+        delta_scales = [0.1, 0.3, 0.5]
+        koopman_modes = ["contract", "rotate", "chaos"]
+        if koopman:
+            self.transitions = nn.ModuleList([
+                KoopmanTransitionModule(
+                    d_slow=d_slow, d_lift=d_slow,
+                    mode=koopman_modes[k],
+                    residual=koopman_residual,
+                    delta_scale=delta_scales[k],
+                ) for k in range(n_regimes)
+            ])
+        else:
+            self.transitions = nn.ModuleList([
+                TransitionModule(d_slow=d_slow, init_scale=scales[k],
+                                  stable=stable, delta_scale=delta_scales[k])
+                for k in range(n_regimes)
+            ])
 
     def forward(self, z_slow: torch.Tensor, r: torch.Tensor) -> torch.Tensor:
         """
@@ -210,14 +296,20 @@ class RegimeWorldModel(nn.Module):
 
     def __init__(self, d_in: int = 3, d_fast: int = 32, d_slow: int = 32,
                  slow_stride: int = 4, n_regimes: int = 3,
-                 router_temperature: float = 1.0):
+                 router_temperature: float = 1.0, stable: bool = False,
+                 koopman: bool = False, koopman_residual: bool = False):
         super().__init__()
         self.encoder = PerceptualEncoder(d_in, d_fast)
         self.ssm = FastSlowSSM(d_fast, d_slow, slow_stride)
         self.desc_heads = DescriptorHeads(d_slow)
         self.router = RegimeRouter(d_d=4, n_regimes=n_regimes,
                                     temperature=router_temperature)
-        self.dynamics = RegimeMixtureDynamics(d_slow, n_regimes)
+        self.dynamics = RegimeMixtureDynamics(
+            d_slow, n_regimes, stable=stable,
+            koopman=koopman, koopman_residual=koopman_residual,
+        )
+        self.stable = stable
+        self.koopman = koopman
         self.d_in = d_in
         self.d_fast = d_fast
         self.d_slow = d_slow

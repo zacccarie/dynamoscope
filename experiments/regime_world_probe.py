@@ -82,10 +82,24 @@ class FlatBaseline(nn.Module):
         return {"z_seq": z_seq, "z_pred": z_pred, "x_recon": x_recon}
 
 
-def train_baseline(model, dataset, n_epochs=60, lr=3e-4, device="cpu"):
+def train_baseline(model, dataset, n_epochs=60, lr=3e-4, device="cpu",
+                    w_multistep: float = 0.0, K_multistep: int = 4,
+                    gamma_multistep: float = 0.9, n_starts_multistep: int = 4):
+    """Train FlatBaseline. Optional multi-step rollout loss (capacity-fairness
+    control for F10 fix). When w_multistep > 0, model is trained with same
+    K-step horizon loss as the RWM stab+ms variant — isolates architecture
+    from training objective.
+
+    Multi-step ramp : OFF in first 30% epochs (warmup), 0.5× in next 30%,
+    full in final 40%. Same schedule as RWM trainer.stage_weights.
+    """
     model = model.to(device)
     optim = torch.optim.Adam(model.parameters(), lr=lr)
+    s1 = int(0.3 * n_epochs); s2 = int(0.6 * n_epochs)
     for epoch in range(n_epochs):
+        if epoch < s1: w_ms_epoch = 0.0
+        elif epoch < s2: w_ms_epoch = 0.5 * w_multistep
+        else: w_ms_epoch = w_multistep
         for sample in dataset:
             x = torch.from_numpy(sample.traj).float().to(device)
             x = (x - x.mean(0, keepdim=True)) / x.std(0, keepdim=True).clamp_min(1e-6)
@@ -93,6 +107,28 @@ def train_baseline(model, dataset, n_epochs=60, lr=3e-4, device="cpu"):
             l_recon = ((out["x_recon"] - x) ** 2).mean()
             l_dyn = ((out["z_pred"][:-1] - out["z_seq"][1:].detach()) ** 2).mean()
             loss = l_recon + l_dyn
+            # Multi-step : roll proj_next K times from random starts in z_seq
+            if w_ms_epoch > 0:
+                z_seq = out["z_seq"]
+                T = z_seq.shape[0]
+                if T >= K_multistep + 2:
+                    max_start = T - K_multistep - 1
+                    if max_start <= n_starts_multistep:
+                        starts = list(range(max_start + 1))
+                    else:
+                        starts = torch.randint(0, max_start + 1,
+                                                (n_starts_multistep,)).tolist()
+                    l_ms = z_seq.sum() * 0.0
+                    for start in starts:
+                        h = z_seq[start]
+                        chain = z_seq.sum() * 0.0
+                        for k in range(K_multistep):
+                            h = model.proj_next(h)
+                            target = z_seq[start + 1 + k].detach()
+                            chain = chain + (gamma_multistep ** k) * \
+                                    ((h - target) ** 2).mean()
+                        l_ms = l_ms + chain / K_multistep
+                    loss = loss + w_ms_epoch * l_ms / max(len(starts), 1)
             optim.zero_grad(); loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()

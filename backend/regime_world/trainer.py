@@ -28,6 +28,11 @@ class TrainConfig:
     w_regime_sup: float = 0.0  # 0 = unsupervised, > 0 = semi-supervised
     target_log_growth_chaotic: float = 0.1
     target_DET_periodic: float = 0.7
+    # Multi-step rollout loss (F10 fix). w_multistep > 0 turns it on.
+    w_multistep: float = 0.0
+    K_multistep: int = 4
+    gamma_multistep: float = 0.9
+    n_starts_multistep: int = 4
 
 
 @dataclass
@@ -52,19 +57,24 @@ def stage_weights(epoch: int, n_epochs: int, cfg: TrainConfig) -> dict:
     s2 = int(0.6 * n_epochs)
     # Supervised regime weight : ramp up from stage 1 (if enabled)
     w_sup = cfg.w_regime_sup
+    w_ms = cfg.w_multistep
     if epoch < s1:
-        # recon + dyn + (sup if any) — warmup
+        # recon + dyn + (sup if any) — warmup. Multi-step OFF (let dyn
+        # stabilize first to avoid early divergence in rollout chain).
         return {"w_dyn": cfg.w_dyn, "w_slow": 0.0, "w_recur": 0.0,
                 "w_lyap": 0.0, "w_entropy": cfg.w_entropy * 0.5,
-                "w_regime_sup": w_sup}
+                "w_regime_sup": w_sup, "w_multistep": 0.0}
     elif epoch < s2:
+        # Ramp multi-step in at half strength.
         return {"w_dyn": cfg.w_dyn, "w_slow": cfg.w_slow,
                 "w_recur": cfg.w_recur, "w_lyap": cfg.w_lyap * 0.3,
-                "w_entropy": cfg.w_entropy, "w_regime_sup": w_sup}
+                "w_entropy": cfg.w_entropy, "w_regime_sup": w_sup,
+                "w_multistep": w_ms * 0.5}
     else:
         return {"w_dyn": cfg.w_dyn, "w_slow": cfg.w_slow,
                 "w_recur": cfg.w_recur, "w_lyap": cfg.w_lyap,
-                "w_entropy": cfg.w_entropy, "w_regime_sup": w_sup}
+                "w_entropy": cfg.w_entropy, "w_regime_sup": w_sup,
+                "w_multistep": w_ms}
 
 
 def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
@@ -74,7 +84,7 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
     device = next(model.parameters()).device
     accum = {k: 0.0 for k in ["total", "recon", "dyn", "slow_weighted",
                               "recur_weighted", "lyap_weighted", "entropy_reg",
-                              "regime_sup"]}
+                              "regime_sup", "multistep"]}
     rs_accum = [0.0, 0.0, 0.0]
     n = 0
     for sample in dataset:
@@ -88,6 +98,11 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
             w_slow=weights["w_slow"], w_recur=weights["w_recur"],
             w_lyap=weights["w_lyap"], w_entropy=weights["w_entropy"],
             w_regime_sup=weights.get("w_regime_sup", 0.0),
+            w_multistep=weights.get("w_multistep", 0.0),
+            K_multistep=cfg.K_multistep,
+            gamma_multistep=cfg.gamma_multistep,
+            n_starts_multistep=cfg.n_starts_multistep,
+            dynamics_module=model.dynamics,
             regime_idx=regime_idx,
             target_log_growth_chaotic=cfg.target_log_growth_chaotic,
             target_DET_periodic=cfg.target_DET_periodic,
