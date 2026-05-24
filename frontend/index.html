@@ -2,26 +2,90 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>DYNAMOSCOPE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#050507" />
+<title>DYNAMOSCOPE — Video Trajectory Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #000;
-    --fg: #e8e8e8;
-    --cyan: #00e5ff;
+    /* Color tokens — single source of truth */
+    --bg: #050507;
+    --bg-elev-1: #0a0a0e;
+    --bg-elev-2: #0f0f15;
+    --bg-elev-3: #14141c;
+    --fg: #f5f5f7;
+    --fg-mute: #a0a0a8;
+    --fg-dim: #6e6e76;
+    --cyan: #00d4ff;
+    --cyan-dim: #008aa8;
     --magenta: #ff2dd4;
     --amber: #ffb400;
     --plasma: #00ff88;
-    --panel: rgba(8, 8, 12, 0.86);
-    --panel-solid: #07070b;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(0, 229, 255, 0.22);
-    --mono: "JetBrains Mono", "PP Neue Bit", "SF Mono", ui-monospace, monospace;
-    --display: "Chakra Petch", "Inter", system-ui, sans-serif;
-    --sidebar-l: 260px;
-    --sidebar-r: 320px;
+    --red: #ff4466;
+    --panel: rgba(10, 10, 14, 0.92);
+    --panel-solid: #0a0a0e;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(0, 212, 255, 0.18);
+    --border-focus: var(--cyan);
+
+    /* Typography */
+    --mono: "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    --display: "Geist", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+    /* Type scale (minor third 1.2) */
+    --fs-xs: 11px;
+    --fs-sm: 12px;
+    --fs-base: 13px;
+    --fs-md: 14px;
+    --fs-lg: 16px;
+    --fs-xl: 19px;
+    --fs-2xl: 23px;
+    --fs-3xl: 28px;
+    --lh-tight: 1.25;
+    --lh-base: 1.5;
+    --lh-loose: 1.7;
+    --tracking-wide: 0.16em;
+    --tracking-extrawide: 0.28em;
+
+    /* Spacing scale (4-base) */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 20px;
+    --s-6: 24px;
+    --s-8: 32px;
+    --s-10: 40px;
+
+    /* Radius */
+    --r-sm: 4px;
+    --r-md: 6px;
+    --r-lg: 10px;
+    --r-pill: 999px;
+
+    /* Layout */
+    --sidebar-l: 280px;
+    --sidebar-r: 340px;
     --topbar-h: 56px;
-    --bottombar-h: 72px;
+    --bottombar-h: 76px;
+
+    /* Touch */
+    --touch-min: 44px;
+
+    /* Motion */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 320ms;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; background: var(--bg); color: var(--fg); font-family: var(--display); overflow: hidden; }
@@ -269,9 +333,537 @@
     .tab { font-size: 8px; padding: 10px 2px; letter-spacing: 0.08em; }
     .topstats .topstat:nth-child(n+5) { display: none; }
   }
+
+  /* ============================================================ */
+  /* DESIGN SYSTEM POLISH                                         */
+  /* ============================================================ */
+
+  /* Smooth font rendering + improved selection */
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+  ::selection { background: rgba(0, 212, 255, 0.25); color: var(--fg); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: var(--r-pill); border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+  /* Universal focus-visible (a11y) */
+  *:focus { outline: none; }
+  *:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+    transition: outline-offset var(--dur-fast) var(--ease-out);
+  }
+  button:focus-visible, select:focus-visible, input:focus-visible {
+    outline-offset: 1px;
+  }
+
+  /* Buttons : modernize all */
+  button {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--fg);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: var(--s-3) var(--s-4);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+    min-height: var(--touch-min);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover:not(:disabled) {
+    background: var(--bg-elev-3);
+    border-color: var(--border-strong);
+  }
+  button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  button.btn-mini, button.btn-icon, button.muted {
+    min-height: 32px;
+    padding: var(--s-2) var(--s-3);
+  }
+  button.tab { min-height: auto; }
+
+  /* Inputs & selects */
+  input, select, textarea {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    color: var(--fg);
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: var(--s-2) var(--s-3);
+    min-height: 36px;
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+  input:hover, select:hover, textarea:hover { border-color: var(--border-strong); }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--cyan);
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--bg-elev-3);
+    padding: 0;
+    border: none;
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    min-height: auto;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--cyan);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--cyan-dim);
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 1px var(--cyan), 0 0 12px rgba(0,212,255,0.4);
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.4);
+  }
+  input[type="file"] { padding: var(--s-2); }
+
+  /* Tabs polish */
+  .tab {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    letter-spacing: 0.10em;
+    text-transform: lowercase;
+    color: var(--fg-dim);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: var(--s-3) var(--s-3);
+    cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+    min-height: 38px;
+  }
+  .tab:hover { color: var(--fg-mute); }
+  .tab.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+  }
+
+  /* Section titles modern */
+  .section-title, .tab-panel h2 {
+    font-family: var(--mono) !important;
+    font-size: var(--fs-xs) !important;
+    font-weight: 600 !important;
+    letter-spacing: var(--tracking-extrawide) !important;
+    color: var(--cyan) !important;
+    text-transform: uppercase;
+    margin-bottom: var(--s-3) !important;
+  }
+  .tab-panel h3 {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide);
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+  .tab-panel p { line-height: var(--lh-base); }
+
+  /* Brand polish */
+  .brand .logo {
+    font-family: var(--display) !important;
+    font-weight: 700 !important;
+    font-size: var(--fs-lg) !important;
+    letter-spacing: 0.18em !important;
+    color: var(--cyan) !important;
+  }
+  .brand .tag {
+    font-family: var(--mono) !important;
+    font-size: var(--fs-xs) !important;
+    color: var(--fg-dim) !important;
+  }
+
+  /* Typography for stat values */
+  .v, .k {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .k { color: var(--fg-dim); letter-spacing: 0.08em; }
+  .v { color: var(--fg); }
+
+  /* ============================================================ */
+  /* HELP MODAL & FLOATING BUTTON                                 */
+  /* ============================================================ */
+
+  #helpFab {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 9999;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-elev-3);
+    border: 1px solid var(--border-strong);
+    color: var(--cyan);
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+    padding: 0;
+    min-height: auto;
+  }
+  #helpFab:hover { transform: scale(1.08); background: var(--cyan); color: var(--bg); }
+  #helpFab:active { transform: scale(0.95); }
+
+  #helpModal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: var(--s-4);
+    animation: fadeIn var(--dur-base) var(--ease-out);
+  }
+  #helpModal.open { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  #helpModal .modal-card {
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg);
+    width: min(820px, 100%);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    animation: slideUp var(--dur-base) var(--ease-out);
+    overflow: hidden;
+  }
+  #helpModal .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--s-4) var(--s-5);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #helpModal .modal-head h2 {
+    font-family: var(--display);
+    font-size: var(--fs-xl);
+    font-weight: 600;
+    color: var(--fg);
+    letter-spacing: 0.05em;
+    text-transform: none;
+    margin: 0;
+  }
+  #helpModal .modal-head .sub {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    color: var(--fg-dim);
+    margin-top: 2px;
+    letter-spacing: var(--tracking-wide);
+  }
+  #helpModal .modal-close {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+  }
+  #helpModal .modal-body {
+    padding: var(--s-5);
+    overflow-y: auto;
+    flex: 1;
+    font-family: var(--display);
+    font-size: var(--fs-base);
+    line-height: var(--lh-loose);
+    color: var(--fg);
+  }
+  #helpModal .modal-body h3 {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    color: var(--cyan);
+    letter-spacing: var(--tracking-extrawide);
+    text-transform: uppercase;
+    margin: var(--s-5) 0 var(--s-2);
+    padding-bottom: var(--s-2);
+    border-bottom: 1px solid var(--border);
+  }
+  #helpModal .modal-body h3:first-child { margin-top: 0; }
+  #helpModal .modal-body dl { margin-bottom: var(--s-4); }
+  #helpModal .modal-body dt {
+    font-weight: 600;
+    color: var(--magenta);
+    margin-top: var(--s-3);
+    font-family: var(--mono);
+    font-size: var(--fs-sm);
+  }
+  #helpModal .modal-body dd {
+    margin-left: var(--s-3);
+    color: var(--fg-mute);
+    font-size: var(--fs-sm);
+  }
+  #helpModal .modal-body .quickstart {
+    background: rgba(0, 212, 255, 0.06);
+    border-left: 2px solid var(--cyan);
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-sm);
+    margin-bottom: var(--s-4);
+  }
+  #helpModal .modal-body code {
+    font-family: var(--mono);
+    background: var(--bg-elev-3);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.92em;
+    color: var(--cyan);
+  }
+
+  /* ============================================================ */
+  /* RESPONSIVE OVERHAUL                                          */
+  /* ============================================================ */
+
+  /* Tablet : collapse right sidebar (use overlay style) */
+  @media (max-width: 1100px) {
+    :root { --sidebar-l: 240px; --sidebar-r: 300px; }
+  }
+
+  /* Smaller laptop */
+  @media (max-width: 900px) {
+    :root { --sidebar-l: 220px; --sidebar-r: 280px; --topbar-h: 50px; }
+    .tab { padding: var(--s-2) 6px; font-size: 10px; }
+  }
+
+  /* Tablet portrait : right sidebar becomes drawer */
+  @media (max-width: 800px) {
+    body {
+      grid-template:
+        "top    top"     var(--topbar-h)
+        "left   center"  1fr
+        "bottom bottom"  var(--bottombar-h) / var(--sidebar-l) 1fr;
+    }
+    .sidebar.right {
+      position: fixed;
+      top: var(--topbar-h);
+      right: 0;
+      bottom: var(--bottombar-h);
+      width: min(380px, 90vw);
+      z-index: 50;
+      transform: translateX(100%);
+      transition: transform var(--dur-slow) var(--ease-out);
+      box-shadow: var(--shadow-lg);
+    }
+    .sidebar.right.open { transform: translateX(0); }
+  }
+
+  /* Phone landscape */
+  @media (max-width: 640px) {
+    :root { --sidebar-l: 64px; --bottombar-h: 60px; --topbar-h: 48px; }
+    .sidebar.left .section-title { display: none; }
+    .sidebar.left .field { display: none; }
+    .sidebar.left .field.essential { display: block; }
+    .brand .tag { display: none; }
+    .topstats { gap: 8px; font-size: 10px; }
+  }
+
+  /* Phone portrait */
+  @media (max-width: 480px) {
+    body {
+      grid-template:
+        "top"     var(--topbar-h)
+        "center"  1fr
+        "bottom"  var(--bottombar-h) / 1fr;
+    }
+    .sidebar.left {
+      position: fixed;
+      top: var(--topbar-h);
+      left: 0;
+      bottom: var(--bottombar-h);
+      width: min(280px, 80vw);
+      z-index: 49;
+      transform: translateX(-100%);
+      transition: transform var(--dur-slow) var(--ease-out);
+    }
+    .sidebar.left.open { transform: translateX(0); }
+    #helpModal .modal-card { max-height: 100vh; border-radius: 0; }
+  }
+
+  /* Touch target enforcement on touch devices */
+  @media (pointer: coarse) {
+    button, input[type="checkbox"], input[type="radio"] {
+      min-height: var(--touch-min);
+    }
+    .tab { min-height: 44px; }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* High-contrast */
+  @media (prefers-contrast: more) {
+    :root {
+      --border: rgba(255,255,255,0.2);
+      --fg-dim: #b0b0b8;
+    }
+  }
+
+  /* Print : hide chrome */
+  @media print {
+    .sidebar, .topbar, .bottombar, #helpFab, .tab { display: none !important; }
+    .center { width: 100%; height: 100vh; }
+  }
 </style>
 </head>
 <body>
+
+<!-- Floating help button — accessible from anywhere -->
+<button id="helpFab" type="button" aria-label="Open help and glossary" title="Help · Glossaire · Manuel (Shift+? to open)">?</button>
+
+<!-- Help modal overlay -->
+<div id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="helpModalTitle">Dynamoscope</h2>
+        <div class="sub">Manuel · Glossaire · Guide d'utilisation</div>
+      </div>
+      <button class="modal-close" type="button" aria-label="Close help" onclick="closeHelpModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p>Dynamoscope analyse une vidéo comme <b>trajectoire dans un espace latent</b>.
+      Pipeline : video → encoder → reduction 3D → métriques dynamiques + topologie + causalité.
+      Manuel complet : <code>MANUAL.md</code> (racine du repo).</p>
+
+      <div class="quickstart">
+        <b style="color: var(--cyan); font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: var(--tracking-wide);">QUICK START</b>
+        <ol style="margin-top: 8px; padding-left: 20px; line-height: 1.7;">
+          <li>Charger une vidéo (ou choisir un système de référence à gauche).</li>
+          <li>Sélectionner un encoder. Lancer le pipeline.</li>
+          <li>Naviguer dans les onglets de droite pour les analyses.</li>
+          <li>Onglet <b>phase-space</b> pour pipeline classique alternatif (Takens delay).</li>
+          <li><b>Run all analyses</b> dans l'onglet status pour tout exécuter d'un coup.</li>
+        </ol>
+      </div>
+
+      <h3>Onglets de droite</h3>
+      <dl>
+        <dt>dynamics</dt><dd>Lyapunov (chaos), correlation dim (fractale), RQA, matrice de récurrence.</dd>
+        <dt>spectral</dt><dd>DMD (modes Koopman + fréquences), spectre puissance, exposant scaling.</dd>
+        <dt>causal</dt><dd>Granger, Transfer Entropy KSG, PCMCI+ graph causal.</dd>
+        <dt>topology</dt><dd>Homologie persistante (H0, H1, H2), entropie persistance.</dd>
+        <dt>SINDy · φ</dt><dd>Découverte équations sparse + indice d'émergence φ_id.</dd>
+        <dt>phase-space</dt><dd>Pipeline classique : 12 observables pixel-level → Takens delay (ou PCA / direct) → trajectoire + verdict régime.</dd>
+        <dt>inspect / segments / clusters / predict</dt><dd>Frame k-NN, shot boundaries, HDBSCAN clustering, prédiction trajectoire.</dd>
+        <dt>DNA · evolution</dt><dd>Score composite 8 axes + évolution sliding window.</dd>
+        <dt>status</dt><dd>Run metadata + 'run all analyses' + export HTML report.</dd>
+      </dl>
+
+      <h3>Glossaire — métriques</h3>
+      <dl>
+        <dt>Lyapunov λ</dt>
+        <dd><b>Formel</b> : pente de ⟨ln d(t)⟩ vs t (Rosenstein). <b>Vulgaire</b> : à quelle vitesse 2 trajectoires proches divergent. λ &gt; 0 = chaos.</dd>
+        <dt>Correlation dim (D)</dt>
+        <dd><b>Formel</b> : d = lim log C(ε) / log ε (Grassberger-Procaccia). <b>Vulgaire</b> : dimension fractale effective. Lorenz : D ≈ 2.06.</dd>
+        <dt>RQA — DET, LAM, RR</dt>
+        <dd>Sur matrice de récurrence Rᵢⱼ = 𝟙[‖zᵢ-zⱼ‖&lt;ε]. DET = fraction sur diagonales ≥ 2 (prédictibilité). LAM = sur verticales. RR = densité globale.</dd>
+        <dt>Lmax / N</dt>
+        <dd>Longueur de la plus longue diagonale / N. Haut = cycle régulier ; bas = chaos.</dd>
+        <dt>Convergence rate</dt>
+        <dd>Décroissance relative du rayon de trajectoire. &gt; 0.5 = converge vers point fixe.</dd>
+        <dt>H0, H1, H2 (persistance)</dt>
+        <dd>Classes homologie sur filtration Vietoris-Rips. H0 = composantes, H1 = cycles, H2 = cavités.</dd>
+        <dt>Transfer Entropy (TE)</dt>
+        <dd>Causalité informationnelle. TE(X→Y) &gt; 0 ⟹ passé X aide prédire futur Y. Estimateur KSG.</dd>
+        <dt>DMD eigenvalues</dt>
+        <dd>Modes Koopman approximés. |λ| = 1 = oscillation stable ; &lt; 1 = décroissance.</dd>
+        <dt>Spectral slope</dt>
+        <dd>Exposant 1/f^α du spectre. α = 0 bruit blanc ; α = 2 brown.</dd>
+        <dt>DNA composite</dt>
+        <dd>Score [0, 100] = somme pondérée 8 axes (chaos, topology, complexity, spectral, structure, causality, predictability, regime_confidence).</dd>
+      </dl>
+
+      <h3>Glossaire — algorithmes</h3>
+      <dl>
+        <dt>Takens delay embedding (1981)</dt>
+        <dd>x(t) = [s(t), s(t+τ), ..., s(t+(m-1)τ)]. Reconstruit l'attracteur depuis une seule observable. Théorème : m ≥ 2d+1.</dd>
+        <dt>UMAP</dt><dd>Réduction non-linéaire préservant voisinages locaux. n_neighbors + min_dist.</dd>
+        <dt>PCA</dt><dd>Projection sur axes de variance maximale. Linéaire, déterministe.</dd>
+        <dt>DMD</dt><dd>Trouve A tel que z_{t+1} ≈ A z_t via SVD. Spectre = modes.</dd>
+        <dt>SINDy</dt><dd>Sparse regression sur library polynomiale → équations dz/dt = f(z).</dd>
+        <dt>PCMCI+</dt><dd>Découverte causale multi-variée pour séries temporelles. PC + MCI.</dd>
+        <dt>HDBSCAN</dt><dd>Clustering hiérarchique densité-based. Pas de K à fixer ; identifie outliers (-1).</dd>
+      </dl>
+
+      <h3>Glossaire — encoders</h3>
+      <dl>
+        <dt>ResNet50 (25M)</dt><dd>He 2016. CNN supervisé ImageNet. Latent 2048d.</dd>
+        <dt>DINOv2-S (22M)</dt><dd>Oquab 2024. ViT self-sup distillation. Latent 384d.</dd>
+        <dt>CLIP ViT-B/32 (151M)</dt><dd>Radford 2021. Image-text contrastive. Query textuel possible.</dd>
+        <dt>VideoMAE-base (86M)</dt><dd>Tong 2022. Self-sup 16-frame clips.</dd>
+        <dt>V-JEPA 2 (326M)</dt><dd>Bardes 2024 Meta. World model prédictif latent. R²=0.57 sur observables = le plus aligné physique.</dd>
+        <dt>delay_* (classical)</dt><dd>Takens delay sur 1 observable physique. 3d latent. Zero GPU. Parfois bat neural sur dynamics.</dd>
+      </dl>
+
+      <h3>Glossaire — visualisations</h3>
+      <dl>
+        <dt>Trajectoire 3D centrale</dt><dd>Latents réduits à 3D. Points = frames. Lignes = ordre temporel. Couleur configurable.</dd>
+        <dt>Recurrence plot</dt><dd>Point clair en (i,j) ⟺ états zᵢ, zⱼ ε-proches. Diagonales = déterminisme.</dd>
+        <dt>Persistence diagram</dt><dd>Points (birth, death). Loin diagonale = features topologiques persistants.</dd>
+        <dt>DMD spectrum</dt><dd>Eigenvalues dans plan complexe. Cercle unité = oscillations stables.</dd>
+      </dl>
+
+      <h3>Raccourcis clavier</h3>
+      <dl>
+        <dt>Shift + ?</dt><dd>Ouvrir / fermer cette aide</dd>
+        <dt>Esc</dt><dd>Fermer modal</dd>
+      </dl>
+
+      <h3>Références</h3>
+      <p style="color: var(--fg-mute); font-size: var(--fs-sm);">
+        Takens 1981 · Rosenstein 1993 · Schreiber 2000 · Wiskott-Sejnowski 2002 ·
+        Brunton 2016 SINDy · Edelsbrunner-Harer persistence · Runge 2018 PCMCI ·
+        Hafner Dreamer · Bardes 2024 V-JEPA · Oquab 2024 DINOv2 · Yu 2020 PCGrad.
+        Bibliography complète : <code>paper/dynamoscope.tex</code> (35 refs).
+      </p>
+    </div>
+  </div>
+</div>
 
 <!-- ─── TOP BAR ─────────────────────────────────────────────── -->
 <div class="topbar">
@@ -490,7 +1082,6 @@
     <button class="tab" data-tab="dna" title="DNA composite score 8 axes + classification">DNA</button>
     <button class="tab" data-tab="evolution" title="Sliding window evolution of metrics through video">evolution</button>
     <button class="tab" data-tab="status" title="Run metadata + pipeline status + 'run all analyses'">status</button>
-    <button class="tab" data-tab="help" title="Guide d'utilisation + glossaire complet métriques/algos/encoders/viz">help</button>
   </div>
 
   <!-- Dynamics -->
@@ -925,8 +1516,8 @@ empty void</textarea>
     </div>
   </div>
 
-  <!-- HELP / Glossary -->
-  <div class="tab-panel" data-panel="help">
+  <!-- HELP / Glossary moved to floating modal (#helpModal). Keep block hidden for legacy callers. -->
+  <div class="tab-panel" data-panel="help" hidden>
     <h2>HELP · GUIDE D'UTILISATION</h2>
     <p style="font-size: 11px; color: rgba(255,255,255,0.75); line-height: 1.5; margin-bottom: 12px;">
       Dynamoscope analyse vidéo comme <b>trajectoire dans espace latent</b>.
@@ -3057,7 +3648,8 @@ document.getElementById('phaseTauAuto').addEventListener('click', () => {
 });
 
 async function runPhaseEmbed() {
-  if (!cacheKey) { setStatus('no video loaded'); return; }
+  const cacheKey = videoCacheKey;
+  if (!cacheKey) { setStatus('phase-space : load video first (upload or demo system)'); return; }
   await loadPhaseObservables();
   setStatus('reconstruction phase-space…', true);
   const m = parseInt(document.getElementById('phaseM').value, 10);
@@ -3091,10 +3683,9 @@ async function runPhaseEmbed() {
     // Take first 3 dims for 3D viz (drop others)
     const coords3 = coords.map(c => [c[0] || 0, c[1] || 0, c[2] || 0]);
 
-    // Replace current trajectory in 3D scene
-    trajCoords = coords3;
+    // Replace current trajectory in 3D scene via existing builder
     rawCoords = null;
-    renderTrajectory();
+    buildTrajectory(coords3);
 
     // Run regime classification + dynamics (for recurrence plot) in parallel
     const [rRegime, rDyn] = await Promise.all([
@@ -3168,6 +3759,45 @@ function drawPhaseRecurrence(R) {
 
 // init observables list dropdown au chargement
 window.addEventListener('DOMContentLoaded', () => { loadPhaseObservables(); });
+
+// Help modal — open/close + keyboard shortcuts
+function openHelpModal() {
+  const m = document.getElementById('helpModal');
+  if (!m) return;
+  m.classList.add('open');
+  m.setAttribute('aria-hidden', 'false');
+  // Focus close button for keyboard a11y
+  const closeBtn = m.querySelector('.modal-close');
+  if (closeBtn) setTimeout(() => closeBtn.focus(), 50);
+}
+function closeHelpModal() {
+  const m = document.getElementById('helpModal');
+  if (!m) return;
+  m.classList.remove('open');
+  m.setAttribute('aria-hidden', 'true');
+  // Return focus to FAB
+  const fab = document.getElementById('helpFab');
+  if (fab) fab.focus();
+}
+document.getElementById('helpFab')?.addEventListener('click', openHelpModal);
+document.getElementById('helpModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'helpModal') closeHelpModal();
+});
+document.addEventListener('keydown', (e) => {
+  // Esc closes modal
+  if (e.key === 'Escape') {
+    const m = document.getElementById('helpModal');
+    if (m && m.classList.contains('open')) { closeHelpModal(); return; }
+  }
+  // Shift+? toggles help
+  if (e.key === '?' && e.shiftKey) {
+    const m = document.getElementById('helpModal');
+    if (!m) return;
+    if (m.classList.contains('open')) closeHelpModal();
+    else openHelpModal();
+    e.preventDefault();
+  }
+});
 
 // ─── Save / export / history ───────────────────────────────
 function snapshotMetrics() {
