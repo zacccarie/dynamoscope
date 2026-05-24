@@ -19,3 +19,14 @@ videos/*.avi
 .mypy_cache/
 .ruff_cache/
 node_modules/
+
+# Paper build artifacts
+paper/arxiv/
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.bbl
+paper/*.blg
+paper/dynamoscope.pdf
+

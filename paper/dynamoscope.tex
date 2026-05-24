@@ -22,8 +22,9 @@
     urlcolor=blue!50!black,
 }
 
-\title{\textsc{Dynamoscope}: Treating Video as a Trajectory in State Space \\
-       \large A Unified Framework for Multi-Scale, Multi-Modal Emergence Analysis}
+\title{\textsc{Dynamoscope}: A Diagnostic Toolbox for Video as
+Dynamical Trajectory, with an Empirical Study of Regime-Conditional
+Mixture-of-Experts World Models}
 
 \author{Zaccarie Aglas}
 \affil{Independent Researcher, Paris, France \\ \texttt{zaccarie@zaccarie.fr}}
@@ -35,44 +36,67 @@
 \maketitle
 
 \begin{abstract}
-We introduce \textsc{Dynamoscope}, an experimental research tool that
-re-frames video analysis as the study of a single trajectory in a
-high-dimensional state space. Rather than treating frames as independent
-images, we encode each frame with a pretrained visual model and analyze
-the resulting sequence as a dynamical system. The pipeline integrates
-sixteen analytical modules ranging from classical dynamical systems
-metrics (Lyapunov exponent, recurrence quantification, correlation
-dimension) to topological data analysis (persistent homology),
-information theoretic causality (Granger, transfer entropy,
-convergent cross-mapping), sparse equation discovery (SINDy), slow
-feature extraction (SFA), latent prediction with counterfactual
-rollouts (predictive coding / JEPA-style imagination), and
-unsupervised cluster discovery (HDBSCAN) with optional CLIP-based
-semantic labeling. Five encoders (ResNet50, ViT-B/16, DINOv2-S, CLIP
-ViT-B/32, and VideoMAE-base) and an aligned audio modality
-(wav2vec2) allow direct comparison of how different pretraining
-objectives---including a natively temporal one---shape the
-recovered trajectory geometry. We argue that the gaps and clusters seen in
-non-linear projections such as UMAP are not noise but structural
-detectors operating at a chosen scale, and we propose an interactive
-parameter optimization layer (random and Bayesian) that lets the user
-discover representations under explicit faithfulness, continuity, and
-spread objectives. Five view modes (phase-space, time-helix, Takens,
-polar, audio, SFA) and five color modes provide epistemic
-triangulation. The tool runs on consumer hardware (Apple MPS / NVIDIA
-CUDA / CPU), supports live webcam capture, persists experiments in
-a SQLite registry, and exports standalone HTML reports. We validate
-the pipeline on synthetic systems (Lorenz, R\"ossler, H\'enon, double
-pendulum) where ground-truth equations are recoverable to $R^2 > 0.99$
-via SINDy, and demonstrate its qualitative behavior on real video.
-\textsc{Dynamoscope} is intended as a microscope for emergent
-structure in time-varying visual signals.
+We present \textsc{Dynamoscope}, a research tool and empirical study
+that treats video as a trajectory in latent state space and asks two
+distinct questions. \textbf{First (diagnostic)}: what geometric and
+dynamical invariants---Lyapunov exponents, recurrence quantification,
+correlation dimension, persistent homology, transfer entropy, sparse
+equation recovery, multi-scale wavelet decomposition---can be
+extracted from latent trajectories produced by different encoders,
+and how do choices of encoder, dimensionality reducer, and
+observable affect those invariants? \textbf{Second (architectural)}:
+does conditioning a small world model on a discrete regime
+distribution measurably improve out-of-distribution prediction
+compared to a flat baseline of matched capacity?
+
+On the diagnostic side we run rigorous ablations on synthetic and
+procedural video. Classical pixel-level observables fed through
+Takens delay embeddings can outperform large pretrained perceptual
+encoders on dynamics-sensitive composite metrics
+($\S$\ref{sec:validation}); the single choice of pixel-level
+observable dominates spatial-resolution, temporal-window, diagnostic
+metric, and trail-rendering choices by three orders of magnitude
+when detecting a Van der Pol Hopf bifurcation
+($\S$\ref{sec:bifurcation}); and V-JEPA-2 is the most physically
+interpretable of five evaluated encoders under a linear-probe
+analysis ($\S$\ref{sec:validation}). We also report a
+\emph{negative-result cascade} on a classical-to-neural distillation
+attempt: four canonical fixes (naive sum, PCGrad gradient surgery,
+channel separation, doubled capacity) all fail to combine perceptual
+reconstruction with classical-geometry imitation, suggesting the two
+objectives demand mutually exclusive latent geometries.
+
+On the architectural side we prototype a 30K- to 134K-parameter
+regime-conditional mixture-of-experts world model
+($\S$\ref{sec:regime-world}) and ablate it against a matched-capacity
+flat-GRU baseline. We document nine concrete failure modes during
+prototyping (probe-ceiling, unsupervised router collapse,
+single-regime training degradation by 4$\times$, an
+entropy-regularizer-induced router bottleneck, etc.) before reaching
+a working configuration. On mixed-regime synthetic training the
+model beats the matched-capacity flat baseline by 3.3$\times$ on
+out-of-distribution one-step prediction MSE; on procedural-video
+DINOv2 features with a router-hyperparameter fix it reaches
+28$\times$ with router accuracy 0.84.
+
+\textbf{We are explicit about what these results do not show.}
+Evaluation is one-step prediction MSE in latent space, i.e.\ the
+model's own training objective---not long-horizon rollout fidelity.
+No downstream task (planning, control, anomaly detection) is tested.
+Data is procedurally generated, not real action video. Regime labels
+are required for training. The architecture is small (134K
+parameters) and only three seeds are reported on the largest
+benchmark. The architectural contribution should be read as a
+structured mixture-of-experts with regime-conditional losses,
+empirically analyzed on synthetic systems---not as a new world-model
+paradigm. We release all code, datasets, experiment scripts, and JSON
+result files at the accompanying repository.
 \end{abstract}
 
 \textbf{Keywords:} video understanding; dynamical systems; persistent
-homology; UMAP; self-supervised learning; causal emergence; world
-models; Takens embedding; Koopman operator; SINDy; slow feature
-analysis.
+homology; UMAP; self-supervised learning; world models; mixture of
+experts; Takens embedding; Koopman operator; SINDy; slow feature
+analysis; regime-conditional representation; honest evaluation.
 
 \section{Introduction}
 
@@ -1749,6 +1773,122 @@ with router accuracy $84\%$.
   report ratios, not significance tests.
 \end{itemize}
 
+\section{What This Paper Does Not Claim}
+\label{sec:not-claim}
+
+To prevent over-reading, we list explicitly what the empirical
+results in this paper \emph{do not} establish:
+
+\paragraph{We do not claim a new world-model paradigm.} The
+regime-aware architecture of $\S$\ref{sec:regime-world} is a
+structured mixture-of-experts \cite{shazeer2017moe} with three
+hand-designed transition modules whose initialization scales encode a
+weak inductive bias (contracting / oscillatory / divergent). The
+novelty is in the regime-conditional loss combination and in the
+honest documentation of nine failure modes that surround it, not in a
+fundamentally new mechanism.
+
+\paragraph{We do not claim better world models in the
+RL/planning sense.} Every evaluation in this paper measures
+\emph{one-step prediction MSE in the model's own latent space}. This
+is what the model directly optimizes and is therefore partially
+circular as an evaluation. A genuine world-model benchmark would
+require: (i) long-horizon rollout fidelity vs.\ ground-truth
+trajectories, (ii) downstream task performance (planning, control,
+anomaly detection), (iii) sample efficiency in an RL loop. None of
+these are reported here.
+
+\paragraph{We do not claim ecological validity on real video.} The
+``video'' in the Phase 2 experiment is procedurally generated
+(bouncing balls, rotating shapes, color morphs, reaction-diffusion,
+double pendulum, Game of Life), not natural action video like Penn
+Action or Kinetics. Real-world dynamics rarely fall cleanly into
+three discrete regimes; the 28$\times$ Phase 2 advantage may collapse
+on natural video where the regime taxonomy fits less well.
+
+\paragraph{We do not claim unsupervised regime discovery.} All
+working configurations use supervised regime cross-entropy on labels
+that the synthetic generator makes available. Without those labels,
+the router collapses to either uniform or single-class output (failure
+mode F2 in $\S$\ref{sec:regime-world}). The core research aspiration
+of an architecture that \emph{discovers} regimes is not met.
+
+\paragraph{We do not claim scale.} The architecture has 30K to 134K
+parameters and is trained on 60--120 trajectories per seed. Modern
+world models operate at $10^7$--$10^9$ parameters on millions of
+trajectories. Our results are at the lower edge of where ``deep
+learning result'' usually starts. We do not know whether the
+architectural advantage persists, grows, or disappears at scale.
+
+\paragraph{We do not claim tight statistical significance on Phase 2.}
+The largest video experiment uses three seeds. We report ratios
+($\mathrm{RWM}/\mathrm{Flat}$), not p-values. The seed-0 anomaly
+(suspicious low MSE plus reduced latent std) is documented but not
+fully explained.
+
+\paragraph{What we do claim, concisely.}
+\begin{itemize}
+\item Classical Takens-embedded observables can outperform large
+  pretrained encoders on a dynamics-richness composite on procedural
+  video (Table~\ref{tab:classical-vs-neural}).
+\item The choice of pixel-level observable carries 230$\times$ more
+  detection-lag spread than any other parameter we ablated on
+  Hopf-bifurcation detection (Table~\ref{tab:observable-sweep}).
+\item Four canonical fixes for the perceptual/classical distillation
+  conflict (sum, PCGrad, channel split, doubled capacity) all
+  fail at single-model scale (Tables~\ref{tab:distillation},
+  \ref{tab:capacity}).
+\item A regime-conditional mixture-of-experts with regime-supervised
+  router beats a matched-capacity flat-GRU baseline by 3.3$\times$
+  (synthetic, $\S$\ref{sec:rwm-capacity}) and 28$\times$ (procedural
+  video, $\S$\ref{sec:rwm-video-final}) on one-step out-of-distribution
+  latent prediction MSE.
+\end{itemize}
+
+\section{Limitations Summary}
+\label{sec:limitations}
+
+For convenience the limitations scattered across the paper are
+collected here:
+
+\begin{enumerate}[label=L\arabic*., leftmargin=*]
+\item \textbf{Evaluation metric circularity.} All architectural
+  comparisons use 1-step latent-space MSE, which is the model's own
+  training objective. No multi-step rollout, no decoder-MSE, no
+  downstream-task evaluation.
+\item \textbf{Lyapunov estimator weak on discrete chaos.} The
+  Rosenstein estimator implemented here works on Lorenz and the
+  circle but saturates on the logistic map at $r{=}4$
+  (Table~\ref{tab:loss-convergence}).
+\item \textbf{Causal sparsity recovery limited.} The $L_1$ +
+  closed-form AR fit recovers only $\sim$40\% F-score on sparse VAR(1)
+  edge structure; richer estimators (kernel, score-based) are not tried.
+\item \textbf{Slowness loss over-regularizes smooth content} when
+  applied without regime conditioning, causing a $-11.7$-point DNA
+  drop in single-objective training (Sec.~\ref{sec:validation}).
+\item \textbf{Distillation incompatibility is representational, not
+  optimization.} Four canonical fixes fail; we do not propose a
+  resolution.
+\item \textbf{Bifurcation detection lag is observable-bound,} not
+  resolution-bound or window-bound or metric-bound. Choice of
+  pixel-level observable is the dominant parameter.
+\item \textbf{Synthetic-only training data} for the regime-aware
+  model. Real action video unevaluated.
+\item \textbf{Supervised regime labels required} for the router to
+  function. Unsupervised regime discovery is the unsolved core problem.
+\item \textbf{Router MLP capacity is the next bottleneck.} At the
+  best hyperparameter setting, router accuracy plateaus near $0.84$
+  while linear-probe ceiling on the same descriptor space is $1.0$.
+\item \textbf{Seed-0 anomaly} on the video experiment: low MSE and
+  $0.67$ router accuracy combine in a way that suggests a
+  degenerate-but-working solution at that random initialization.
+\item \textbf{Three seeds} on the largest experiment is insufficient
+  for tight statistical claims.
+\item \textbf{No matched-encoder comparison on real video.} We use
+  frozen DINOv2-S; we do not compare against, e.g., a from-scratch
+  encoder trained jointly with the world model.
+\end{enumerate}
+
 \section{Conclusion}
 
 We have presented \textsc{Dynamoscope}, a unified, modular tool for
@@ -1948,6 +2088,12 @@ Yu, T., Kumar, S., Gupta, A., Levine, S., Hausman, K., \& Finn, C.
 (2020). Gradient surgery for multi-task learning.
 \emph{Advances in Neural Information Processing Systems}, 33,
 5824--5836.
+
+\bibitem{shazeer2017moe}
+Shazeer, N., Mirhoseini, A., Maziarz, K., Davis, A., Le, Q., Hinton, G.,
+\& Dean, J. (2017). Outrageously large neural networks: The
+sparsely-gated mixture-of-experts layer.
+\emph{International Conference on Learning Representations (ICLR)}.
 
 \end{thebibliography}
 
