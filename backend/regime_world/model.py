@@ -249,3 +249,45 @@ class RegimeWorldModel(nn.Module):
 
     def count_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    @torch.no_grad()
+    def rollout(self, x_context: torch.Tensor, K: int) -> dict:
+        """Autoregressive K-step rollout in z_slow space.
+
+        Encode x_context fully → take final z_slow state → iterate
+        z_slow_{t+1} = regime_mixture(z_slow_t, r) for K steps.
+
+        Router output r computed once from final descriptor on context
+        (regime doesn't shift during rollout; assumption valid only
+        within one regime). For real video that transitions regime,
+        re-compute r per step using a sliding window.
+
+        Args:
+            x_context: (T_ctx, d_in) context trajectory
+            K: number of rollout steps to predict
+        Returns:
+            dict with :
+              z_slow_pred : (K, D_slow) predicted slow trajectory
+              r           : (3,) regime distribution used
+              z_slow_ctx  : (T_ctx_s, D_slow) encoded context for ref
+        """
+        # Encode context fully to get last z_slow state + regime r
+        z_fast_enc = self.encoder(x_context)
+        z_fast, z_slow_ctx = self.ssm(z_fast_enc)
+        d_dyn = self.desc_heads(z_slow_ctx)
+        r = self.router(d_dyn)
+
+        # Initial state = last slow latent
+        z = z_slow_ctx[-1].clone()
+        preds = []
+        for _ in range(K):
+            # Mixture transition (z is single step (D_slow,))
+            z_per = z.unsqueeze(0)  # (1, D_slow)
+            z_next = self.dynamics(z_per, r).squeeze(0)
+            preds.append(z_next)
+            z = z_next
+        return {
+            "z_slow_pred": torch.stack(preds),
+            "r": r,
+            "z_slow_ctx": z_slow_ctx,
+        }
