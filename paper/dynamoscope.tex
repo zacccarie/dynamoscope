@@ -13,6 +13,8 @@
 \usepackage{authblk}
 \usepackage{caption}
 \usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
 
 \geometry{margin=2.5cm}
 \hypersetup{
@@ -1380,6 +1382,122 @@ on regime should generalize better OOD than flat latents.
 
 \subsection{Architecture}
 \label{sec:rwm-arch}
+
+The full architecture is summarized in Figure~\ref{fig:dynamodel}. We
+refer to this instantiation of the regime-conditional mixture-of-experts
+world model as \textsc{Dynamodel}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  node distance=8mm and 10mm,
+  block/.style={
+    rectangle, draw=black, fill=gray!5,
+    minimum width=22mm, minimum height=9mm,
+    rounded corners=2pt, align=center,
+    inner sep=2pt, font=\scriptsize
+  },
+  blockcore/.style={
+    block, fill=gray!10, draw=black, very thick,
+  },
+  blocksmooth/.style={
+    block, draw=teal!70!black, fill=teal!8,
+  },
+  blockperiodic/.style={
+    block, draw=olive!70!black, fill=olive!8,
+  },
+  blockchaotic/.style={
+    block, draw=red!70!black, fill=red!8,
+  },
+  blockloss/.style={
+    block, draw=orange!70!black, fill=orange!5, font=\tiny,
+  },
+  blockdesc/.style={
+    block, fill=gray!3, draw=gray!50,
+    font=\tiny, minimum width=16mm,
+  },
+  arr/.style={->, >=Stealth, thick, draw=black!70},
+  arrgate/.style={->, >=Stealth, dashed, draw=red!60!black, thick},
+  arrloss/.style={->, >=Stealth, draw=orange!70!black},
+  group/.style={
+    rectangle, draw=gray!50, dashed,
+    rounded corners=4pt, inner sep=2.5mm,
+  },
+  label/.style={font=\tiny\itshape, gray!50!black},
+]
+\node[block] (input) {INPUT};
+\node[blockcore, right=of input] (enc) {ENCODER\\\tiny MLP / DINOv2};
+\node[blockcore, right=of enc] (fast) {FAST GRU\\\tiny per-step};
+\node[blockcore, right=of fast] (slow) {SLOW GRU\\\tiny every k=4};
+
+\node[group, below=12mm of enc.south, anchor=north, minimum width=55mm] (descg) {};
+\node[label, above=0pt of descg.north] {DESCRIPTORS $d_{\text{dyn}} \in \mathbb{R}^4$};
+\node[blockdesc] at ([yshift=-1mm]descg.center) (d1) {SLOW};
+\node[blockdesc, left=2mm of d1] (d0) {VAR};
+\node[blockdesc, right=2mm of d1] (d2) {REC};
+\node[blockdesc, right=2mm of d2] (d3) {LYAP};
+
+\node[blockcore, draw=orange!70!black, right=12mm of descg] (router) {ROUTER\\\tiny MLP+softmax};
+
+\node[group, right=8mm of router, minimum width=38mm] (regg) {};
+\node[label, above=0pt of regg.north] {$r \in \Delta^2$};
+\node[blocksmooth, scale=0.8] at ([xshift=-12mm]regg.center) (rs) {S};
+\node[blockperiodic, scale=0.8] at (regg.center) (rp) {P};
+\node[blockchaotic, scale=0.8] at ([xshift=12mm]regg.center) (rc) {C};
+
+\node[group, below=14mm of router.south, anchor=north, minimum width=125mm] (dyng) {};
+\node[label, above=0pt of dyng.north] {MIXTURE DYNAMICS $\hat z_{t+1} = \sum_k r_t^{(k)} \Phi_k(z_t)$};
+\node[blocksmooth] at ([xshift=-42mm,yshift=-1mm]dyng.center) (phis) {$\Phi_{\text{smooth}}$\\\tiny init 0.3};
+\node[blockperiodic] at ([yshift=-1mm]dyng.center) (phip) {$\Phi_{\text{periodic}}$\\\tiny init 0.6};
+\node[blockchaotic] at ([xshift=42mm,yshift=-1mm]dyng.center) (phic) {$\Phi_{\text{chaotic}}$\\\tiny init 1.0};
+\node[circle, draw=olive!70!black, very thick, minimum size=9mm, right=3mm of phic] (mix) {$\Sigma$};
+
+\node[blockcore, below=16mm of phis.south, anchor=north] (dec) {DECODER};
+
+\node[group, right=3mm of dec, minimum width=115mm, fill=orange!3, draw=orange!50] (lossg) {};
+\node[label, above=0pt of lossg.north] {LOSS $\mathcal{L} = \mathcal{L}_{\text{rec}} + \mathcal{L}_{\text{dyn}} + r_{\text{p}}(\mathcal{L}_{\text{slow}}+\mathcal{L}_{\text{rec}}) + r_{\text{c}}\mathcal{L}_{\text{lyap}} + \beta\mathcal{L}_{\text{ent}} + \alpha\mathcal{L}_{\text{sup}}$};
+\node[blockloss] at ([xshift=-45mm,yshift=-1mm]lossg.center) (l1) {$\mathcal{L}_{\text{rec}}$};
+\node[blockloss, right=1mm of l1] (l2) {$\mathcal{L}_{\text{dyn}}$};
+\node[blockloss, right=1mm of l2] (l3) {$\mathcal{L}_{\text{slow}}$};
+\node[blockloss, right=1mm of l3] (l4) {$\mathcal{L}_{\text{rec}}$};
+\node[blockloss, right=1mm of l4] (l5) {$\mathcal{L}_{\text{lyap}}$};
+\node[blockloss, right=1mm of l5] (l6) {$\mathcal{L}_{\text{ent}}$};
+\node[blockloss, right=1mm of l6, draw=red!70!black, very thick] (l7) {$\mathcal{L}_{\text{sup}}$};
+
+\draw[arr] (input) -- (enc);
+\draw[arr] (enc) -- (fast);
+\draw[arr] (fast) -- (slow);
+\draw[arr] (slow) |- ([yshift=2mm]descg.north east);
+\draw[arr] (descg) -- (router);
+\draw[arr] (router) -- (regg);
+\draw[arr] (slow.south) ++(0,-2mm) |- ([xshift=2mm]phis.north);
+\draw[arr] (slow.south) ++(0,-2mm) |- ([xshift=2mm]phip.north);
+\draw[arr] (slow.south) ++(0,-2mm) |- ([xshift=2mm]phic.north);
+\draw[arrgate] (rs.south) |- (mix.west);
+\draw[arrgate] (rp.south) |- (mix.west);
+\draw[arrgate] (rc.south) |- (mix.west);
+\draw[arr] (phis) -- (mix);
+\draw[arr] (phip) -- (mix);
+\draw[arr] (phic) -- (mix);
+\draw[arrloss] (enc.south) -- ++(0,-3mm) -| (dec.north);
+\draw[arrloss] (dec) -- (l1);
+\draw[arrloss] (mix.south) -- ++(0,-3mm) -| (l2.north);
+\draw[arrloss] (slow.south east) -- ++(2mm,-2mm) -| (l3.north);
+\end{tikzpicture}
+\caption{\textsc{Dynamodel} architecture. State factorization
+$s_t = (z_{\text{fast}}, z_{\text{slow}}, d_{\text{dyn}}, r)$.
+Solid black: forward signal. Dashed red: router gating into mixture
+dynamics. Orange: loss connections. Each $\Phi_k$ has a regime-specific
+initialization scale (0.3, 0.6, 1.0) as a weak inductive bias. Loss
+weights are regime-conditional: $\mathcal{L}_{\text{slow}}$ and
+$\mathcal{L}_{\text{rec}}$ gated by $r_{\text{periodic}}$,
+$\mathcal{L}_{\text{lyap}}$ by $r_{\text{chaotic}}$, $\mathcal{L}_{\text{sup}}$
+provides supervised regime CE. Total: 30K params (Phase 1) to 134K
+(Phase 2 on DINOv2 features). Best result: $28\times$ better OOD
+1-step latent MSE than matched-capacity flat-GRU, router accuracy 0.84.}
+\label{fig:dynamodel}
+\end{figure}
 
 State factorization:
 $$
