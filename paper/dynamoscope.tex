@@ -101,15 +101,18 @@ remains high (F11). The architectural claim is recovered for integral
 attractor quality on periodic and chaotic regimes; smooth-regime
 training stability is the next bottleneck.
 
-\textbf{Domain transfer (Sprint 5, finance).} We stress-test the
+\textbf{Domain transfer (Sprint 5--6, finance).} We stress-test the
 architecture on a domain whose natural structure matches the K=3
-regime assumption : a synthetic 3-regime market with hidden-Markov
-bull/bear/sideways transitions and GARCH-like volatility clustering.
-The \texttt{per\_ts\_lyap} variant (Sprint-4 winner) beats the F10-fix
+regime assumption. On a synthetic 3-regime market (Sec.~\ref{sec:rwm-finance})
+the \texttt{per\_ts\_lyap} variant (Sprint-4 winner) beats the F10-fix
 baseline by $\approx 15\times$ on bull and $\approx 16\times$ on bear
-at $K{=}24$ with $p{<}0.05$ at 10 seeds, at matched-or-lower capacity.
-The same architecture fails on Penn Action real video (F15, no
-significance). The model is a \emph{domain-conditional} contribution :
+at $K{=}24$ with $p{<}0.05$ at 10 seeds. On real BTC-USD + ETH-USD
+daily candles fetched via yfinance (Sec.~\ref{sec:rwm-real-finance})
+the same configuration reaches $p{=}0.040$\textsuperscript{*} on the
+bear regime ($18\times$ better than baseline) and $p{=}0.050$ borderline
+on bull --- the first $p{<}0.05$ result of the paper on a real-world
+dataset. The same architecture fails on Penn Action real video (F15,
+no significance). The model is a \emph{domain-conditional} contribution :
 it helps where the underlying signal has a small number of distinct
 dynamical modes (finance, EEG sleep stages, climate ENSO, robotic gait
 phases), and does not help on high-dim natural-video features.
@@ -2629,8 +2632,106 @@ manifold with poorly-separated regimes (real human action video).
 For the canonical regime-switching domains of finance, EEG sleep
 stages, climate ENSO, and bipedal gait phases, the architecture has
 empirical evidence of an advantage at matched capacity with
-$p{<}0.05$ at 10 seeds. We test only finance here ; the other
-three are explicit future work.
+$p{<}0.05$ at 10 seeds (synthetic finance, Sec.~\ref{sec:rwm-finance};
+real BTC + ETH below, Sec.~\ref{sec:rwm-real-finance}). The other
+three (EEG, climate, gait) are explicit future work.
+
+\subsection{Sprint 6A : real BTC + ETH validation}
+\label{sec:rwm-real-finance}
+
+Replace the synthetic GARCH market by 5 years of daily BTC-USD and
+ETH-USD candles fetched via yfinance ($N{=}1826$ each, $50$ windows
+of $T{=}256$ days total, $5$ features per step : log-return,
+log-volume, realized vol over $5$ days, RSI-14, SMA-20 deviation).
+Per-step regime labels are computed from a transparent heuristic
+(SMA slope sign + realized-vol quantile) for trainer-compat CE; they
+are never used for evaluation. Five configurations : same RWM
+variants as Sprint 5 plus an LSTM baseline (cell-based
+\texttt{nn.LSTMCell}, $d_h{=}48$, $\sim 28$K params --- standard
+finance ML baseline).
+
+\begin{table}[h]
+\centering
+\caption{Sprint 6A real BTC + ETH : $K{=}24$ MSE per (mapped) regime,
+10 seeds. Best per column in \textbf{bold}.
+\textsuperscript{*}$p{<}0.05$ Welch's t-test vs \texttt{baseline}.}
+\label{tab:sprint6a-real}
+\begin{tabular}{lrrrr}
+\toprule
+Model & bull (smooth) & sideways (periodic) & bear (chaotic) & params \\
+\midrule
+\texttt{baseline}     & $0.101 \pm 0.09$       & $0.086 \pm 0.09$       & $0.033 \pm 0.02$       & 30.4K \\
+\texttt{per\_timestep}& $0.078 \pm 0.10$       & $0.076 \pm 0.10$       & $0.044 \pm 0.07$       & 30.4K \\
+\texttt{per\_ts\_lyap}& $\bm{0.026 \pm 0.06}$  & $\bm{0.033 \pm 0.08}$  & $\bm{0.0018 \pm 0.002}$\textsuperscript{*} & 30.4K \\
+\texttt{flat\_h64\_ms}& $0.109 \pm 0.03$       & $0.139 \pm 0.03$       & $0.067 \pm 0.01$\textsuperscript{*}-worse & 38.1K \\
+\texttt{lstm\_h48\_ms}& $0.069 \pm 0.04$       & $0.068 \pm 0.02$       & $0.040 \pm 0.02$       & 28.1K \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Findings on real cryptocurrency data.}
+
+(a) \texttt{per\_ts\_lyap} (Sprint-4 winner) is the only configuration
+that achieves $p{<}0.05$ on a regime : bear at $p{=}0.040$
+($18\times$ better than baseline). Bull is borderline at $p{=}0.050$
+($4\times$ better). This is the first $p{<}0.05$ result of the entire
+paper on a real-world (not synthesized) dataset.
+
+(b) \texttt{per\_timestep} alone --- winner on Sprint 3, Sprint 4
+synth, and Sprint 5 synth finance --- \emph{loses its significance}
+on real data. The Lyapunov regularizer is the critical addition that
+preserves the advantage. Plausible mechanism : real BTC volatility
+clustering creates short bursts where the per-step router would
+otherwise oscillate; the Lyap penalty stabilizes the mixture under
+those bursts.
+
+(c) The flat-GRU baseline (\texttt{flat\_h64\_ms}, $38$K params, $25\%$
+more capacity than RWM) is significantly \emph{worse} than baseline on
+bear ($p{=}0.032$). The LSTM baseline at $28$K params is directionally
+better but not significant on any regime. The RWM architectural gain
+is not a capacity or recurrent-network artifact.
+
+(d) Sample-size caveat : the heuristic bear-regime labels yield only
+$n{=}4$ bear-dominant windows per seed in the 5-year period (mostly
+a bull market on BTC/ETH). The $p{=}0.040$ on bear is therefore a
+\emph{small-sample} significance ; a 10-year period including the
+2018 and 2022 crashes would tighten the interval and is the natural
+follow-up.
+
+\paragraph{Router visualization on real BTC.} Figure~\ref{fig:btc-router}
+overlays the trained \texttt{per\_ts\_lyap} model's per-timestep router
+output $r_t$ on a 256-day BTC price window, alongside the heuristic
+regime labels used as supervision. Three observations : (i) the router
+genuinely uses the bear (red) channel during volatility spikes that
+correspond to drawdowns ; (ii) bull (green) dominance correlates with
+sustained uptrends ; (iii) sideways (yellow) tracks the consolidation
+periods between trend phases. The model has learned a non-trivial
+regime decomposition on real data, not a degenerate one-class output.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{../figures/finance_router/router_btc_window10.png}
+\caption{Trained \texttt{per\_ts\_lyap} (Sprint-4 winner) router output
+on a $256$-day real BTC-USD window. Top : BTC close price.
+Middle : router output $r_t$ stacked area (bull / sideways / bear).
+Bottom : heuristic regime labels (supervision target).
+Industrial-lab palette : green = bull (smooth), sulfur = sideways
+(periodic), warning red = bear (chaotic).}
+\label{fig:btc-router}
+\end{figure}
+
+\paragraph{Closing the Penn Action vs finance loop.}
+We now have the cleanest possible domain-conditional statement : the
+same code, same hyperparameters, same training schedule (1) wins
+$p{<}0.05$ on synthetic GARCH-style finance (Sec.~\ref{sec:rwm-finance}),
+(2) wins $p{<}0.05$ on real BTC + ETH bear regime
+(Sec.~\ref{sec:rwm-real-finance}, above), (3) loses on Penn Action
+real video (Sec.~\ref{sec:rwm-penn-action}). The differentiating
+factor is not synth vs real, nor data scale, nor pre-trained features,
+but \emph{domain regime structure} : where the underlying signal has
+distinct dynamical modes the K=3 router can capture, the architecture
+helps ; where it does not, the architecture is no help and sometimes
+a hindrance.
 
 \section{What This Paper Does Not Claim}
 \label{sec:not-claim}
@@ -2828,9 +2929,19 @@ collected here:
   on real BTC/equity tick data. The generator builds the K=3 regime
   structure into the data by construction, which is the canonical
   finance assumption (Hamilton 1989, regime-switching econometrics)
-  but is exactly what the architecture is designed to exploit. A real
-  intraday equity / crypto validation at $\geq 10$ seeds is the
-  required follow-up before claiming financial deployability.
+  but is exactly what the architecture is designed to exploit.
+\item \textbf{Real BTC + ETH bear sample size limited.} The
+  Sprint-6A real-data validation
+  (Sec.~\ref{sec:rwm-real-finance}, $p{=}0.040$ on bear regime at 10
+  seeds) is over 5 years of BTC + ETH daily candles, a period
+  dominated by a bull market. The heuristic-labeled bear-dominant
+  windows are only $n{=}4$ per seed. The $p$-value is therefore a
+  small-sample significance and the effect size estimate has wide
+  intervals. A 10-year period spanning the 2018 and 2022 crashes,
+  intraday data, or a wider set of tickers (SPY, NDAQ, gold, FX)
+  is required for a robust ``deployable on real finance'' claim.
+  This is also the first $p{<}0.05$ on any non-synthetic dataset
+  in the paper ; we treat it as encouraging, not definitive.
 \end{enumerate}
 
 \section{Conclusion}

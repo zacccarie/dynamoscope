@@ -82,6 +82,42 @@ class FlatBaseline(nn.Module):
         return {"z_seq": z_seq, "z_pred": z_pred, "x_recon": x_recon}
 
 
+class LSTMBaseline(nn.Module):
+    """Sprint 6 baseline : LSTM-based (standard finance ML).
+
+    Same interface as FlatBaseline (returns z_seq, z_pred, x_recon).
+    Capacity-matched to RWM-stab at d_h=48 → ~30K params.
+    """
+
+    def __init__(self, d_in=5, d_h=48):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(d_in, 64), nn.SiLU(), nn.Linear(64, d_h),
+        )
+        self.lstm = nn.LSTMCell(d_h, d_h)
+        self.proj_next = nn.Linear(d_h, d_h)
+        self.decoder = nn.Sequential(
+            nn.Linear(d_h, 64), nn.SiLU(), nn.Linear(64, d_in),
+        )
+        self.d_h = d_h
+
+    def forward(self, x):
+        z = self.encoder(x)
+        T = z.shape[0]
+        h = torch.zeros(self.d_h, device=z.device)
+        c = torch.zeros(self.d_h, device=z.device)
+        z_seq = []; z_pred = []
+        for t in range(T):
+            h, c = self.lstm(z[t:t + 1],
+                              (h.unsqueeze(0), c.unsqueeze(0)))
+            h = h.squeeze(0); c = c.squeeze(0)
+            z_seq.append(h)
+            z_pred.append(self.proj_next(h))
+        return {"z_seq": torch.stack(z_seq),
+                "z_pred": torch.stack(z_pred),
+                "x_recon": self.decoder(z)}
+
+
 def train_baseline(model, dataset, n_epochs=60, lr=3e-4, device="cpu",
                     w_multistep: float = 0.0, K_multistep: int = 4,
                     gamma_multistep: float = 0.9, n_starts_multistep: int = 4):

@@ -25,6 +25,16 @@ if [ -f dynamoscope.bbl ]; then
   cp dynamoscope.bbl "$BUILD_DIR/"
 fi
 
+# Copy figure assets referenced via ../figures/ in the .tex source.
+# Arxiv compilation needs the figure files alongside the .tex; mirror
+# the parent project's figures/ inside the bundle so paths still resolve.
+if [ -d ../figures ]; then
+  mkdir -p "$BUILD_DIR/figures"
+  cp -R ../figures/* "$BUILD_DIR/figures/" 2>/dev/null || true
+fi
+# Also copy docs/dynamodel/ assets (Sec.~\ref{fig:dynamodel} TikZ uses an
+# externally-rendered SVG, but the inline TikZ doesn't need extras).
+
 # Add ancillary README declaring contents
 cat > "$BUILD_DIR/README" <<'EOF'
 Dynamoscope arxiv submission
@@ -45,7 +55,9 @@ EOF
 
 # Make the tarball (arxiv accepts .tar.gz)
 cd "$BUILD_DIR"
-tar czf "$TARGET" dynamoscope.tex README $([ -f dynamoscope.bbl ] && echo dynamoscope.bbl || echo "")
+tar czf "$TARGET" dynamoscope.tex README \
+    $([ -f dynamoscope.bbl ] && echo dynamoscope.bbl || echo "") \
+    $([ -d figures ] && echo figures || echo "")
 cd ..
 
 echo "Built $BUILD_DIR/$TARGET"
