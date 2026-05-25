@@ -478,7 +478,8 @@ class RegimeWorldModel(nn.Module):
                  learned_desc_dim: int = 8,
                  hybrid_descriptors: bool = False,
                  per_timestep_router: bool = False, router_window: int = 4,
-                 continuous_regime: bool = False, n_basis: int = 4):
+                 continuous_regime: bool = False, n_basis: int = 4,
+                 frozen_router: bool = False):
         super().__init__()
         self.encoder = PerceptualEncoder(d_in, d_fast)
         self.ssm = FastSlowSSM(d_fast, d_slow, slow_stride)
@@ -519,6 +520,10 @@ class RegimeWorldModel(nn.Module):
         self.stable = stable
         self.koopman = koopman
         self.n_regimes = n_regimes
+        # Sprint 6B diagnostic : frozen_router forces uniform 1/n_regimes
+        # output. Ablates the router's role to test whether the mixture
+        # routing actually contributes to the win.
+        self.frozen_router = frozen_router
         self.d_in = d_in
         self.d_fast = d_fast
         self.d_slow = d_slow
@@ -555,6 +560,14 @@ class RegimeWorldModel(nn.Module):
         else:
             d_dyn = self.desc_heads(z_slow)        # (d_d,)
             r = self.router(d_dyn)                 # (n_regimes,)
+        # Sprint 6B diagnostic : if frozen_router, override router output
+        # with uniform 1/K. Ablates routing — tests whether the win comes
+        # from the mixture's averaged dynamics or from router-mediated
+        # regime switching.
+        if self.frozen_router:
+            K = self.n_regimes
+            uniform = torch.ones_like(r) / float(K)
+            r = uniform
         z_slow_pred = self.dynamics(z_slow, r)     # (T_s, D_slow)
         x_recon = self.decoder(z_fast_enc)         # (T, d_in)
         return {

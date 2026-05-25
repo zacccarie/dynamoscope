@@ -60,22 +60,35 @@ class HMMBaseline(nn.Module):
 
     @torch.no_grad()
     def forward(self, x: torch.Tensor) -> dict:
-        """Returns z_seq (= input) + z_pred (= HMM expected next-step features).
-        Shapes match trainer/eval expectations.
-        """
+        """Returns z_seq (= input) + z_pred + z_slow (alias) for eval compat."""
         x_np = x.cpu().numpy().astype(np.float32)
         T = x_np.shape[0]
         if not self.fitted:
             z_pred = torch.zeros_like(x)
-            return {"z_seq": x.clone(), "z_pred": z_pred, "x_recon": x.clone()}
-        # Posterior probabilities of states at each step
-        posteriors = self.hmm.predict_proba(x_np)  # (T, K)
-        # Expected next-step state distribution = posterior @ trans_matrix
-        next_state_probs = posteriors @ self.hmm.transmat_  # (T, K)
-        # Expected emission = sum_k P(s=k) · means[k]
-        z_pred_np = next_state_probs @ self.hmm.means_  # (T, d_in)
+            return {"z_seq": x.clone(), "z_pred": z_pred, "x_recon": x.clone(),
+                     "z_slow": x.clone(), "r": torch.ones(self.n_states) / self.n_states}
+        posteriors = self.hmm.predict_proba(x_np)
+        next_state_probs = posteriors @ self.hmm.transmat_
+        z_pred_np = next_state_probs @ self.hmm.means_
         z_pred = torch.from_numpy(z_pred_np).float().to(x.device)
-        return {"z_seq": x.clone(), "z_pred": z_pred, "x_recon": x.clone()}
+        return {"z_seq": x.clone(), "z_pred": z_pred, "x_recon": x.clone(),
+                 "z_slow": x.clone(),
+                 "r": torch.from_numpy(posteriors).float().to(x.device)}
+
+    def proj_next(self, h: torch.Tensor) -> torch.Tensor:
+        """Single-step transition for flat-eval compatibility : h is a
+        single state (d_in,). Returns expected next emission via HMM
+        transition + means.
+        """
+        if not self.fitted:
+            return h.clone()
+        # h shape : (d_in,) — treat as a 'state' for which we don't know
+        # the regime, so use uniform posterior, advance once via trans.
+        K = self.n_states
+        cur = np.ones(K) / K
+        next_probs = cur @ self.hmm.transmat_
+        mean = next_probs @ self.hmm.means_
+        return torch.from_numpy(mean).float().to(h.device)
 
     @torch.no_grad()
     def rollout(self, x_context: torch.Tensor, K: int) -> dict:
@@ -135,12 +148,30 @@ class MarkovSwitchBaseline(nn.Module):
                 print(f"  [warn] MarkovSwitch fit failed: {e}")
                 self.fitted = False
 
+    def proj_next(self, h: torch.Tensor) -> torch.Tensor:
+        """Single-step forecast for flat-eval. Uses fitted regime means."""
+        if not self.fitted or self.result is None:
+            return h.clone()
+        means = self.result.params[:self.n_states]
+        cur = np.ones(self.n_states) / self.n_states
+        try:
+            trans = self.result.regime_transition.squeeze()
+            if trans.ndim == 3: trans = trans[:, :, 0]
+        except Exception:
+            trans = np.eye(self.n_states) * 0.9 + 0.05
+        cur = cur @ trans
+        ret = cur @ means
+        row = h.cpu().numpy().astype(np.float32).copy()
+        row[0] = ret
+        return torch.from_numpy(row).float().to(h.device)
+
     @torch.no_grad()
     def forward(self, x: torch.Tensor) -> dict:
         T = x.shape[0]
         if not self.fitted or self.result is None:
             return {"z_seq": x.clone(), "z_pred": torch.zeros_like(x),
-                     "x_recon": x.clone()}
+                     "x_recon": x.clone(), "z_slow": x.clone(),
+                     "r": torch.ones(self.n_states) / self.n_states}
         # Expected return per step = sum_k P(s=k|past) · μ_k
         means = self.result.params[:self.n_states]  # regime means
         # Use smoothed marginal probabilities, then advance via transition.
@@ -164,7 +195,9 @@ class MarkovSwitchBaseline(nn.Module):
         z_pred_np = np.tile(ret_pred_1d[:, None], (1, self.d_in))
         z_pred_np[:, 1:] = x[:, 1:].cpu().numpy()  # passthrough other features
         z_pred = torch.from_numpy(z_pred_np).float().to(x.device)
-        return {"z_seq": x.clone(), "z_pred": z_pred, "x_recon": x.clone()}
+        return {"z_seq": x.clone(), "z_pred": z_pred, "x_recon": x.clone(),
+                 "z_slow": x.clone(),
+                 "r": torch.from_numpy(cur.astype(np.float32)).to(x.device)}
 
     @torch.no_grad()
     def rollout(self, x_context: torch.Tensor, K: int) -> dict:
