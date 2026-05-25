@@ -26,11 +26,13 @@ class LatentMLP(nn.Module):
     """
     def __init__(self, dim: int, hidden: int = 256):
         super().__init__()
-        h = min(hidden, dim)
+        # Fix : utiliser hidden inconditionnellement. Le min() bridait la capacité
+        # à dim quand dim<hidden (cas usuel : dim=8, hidden=256 → MLP devenait 8→8→8
+        # au lieu de 8→256→8), collapse de la capacité effective du résidu.
         self.net = nn.Sequential(
-            nn.Linear(dim, h),
+            nn.Linear(dim, hidden),
             nn.GELU(),
-            nn.Linear(h, dim),
+            nn.Linear(hidden, dim),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
