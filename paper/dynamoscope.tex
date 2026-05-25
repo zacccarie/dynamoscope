@@ -3107,6 +3107,128 @@ not solve.
   bear regime would preserve directional gradients that the
   current uniform-stable variant erases.
 \end{itemize}
+
+\subsection{Sprint 9 (theoretical) : why multi-step rollout loss is
+the load-bearing ingredient}
+\label{sec:rwm-sprint9-theory}
+
+Sprint 7 (\S\ref{sec:rwm-sprint7}) found that, of the four
+architectural ingredients identified after Sprint 6B, only the
+multi-step rollout loss showed individual statistical
+significance at $n {=} 10$. We did not run a new experiment for
+this section --- it is a post-hoc theoretical reading of the
+already-reported numbers, intended to make the empirical pattern
+make sense and to be explicit about its limits.
+
+\paragraph{Setup.} Let $z_t \in \mathbb{R}^d$ be the slow latent
+at slow-step $t$, and let $\hat{z}_{t+1} = \Phi(z_t)$ be the
+learned one-step transition. Define the
+\emph{one-step training loss}
+\[
+L_1(\Phi) = \mathbb{E}_{z_t \sim \mathcal{D}}
+  \bigl\| \Phi(z_t) - z_{t+1} \bigr\|^2
+\]
+where $\mathcal{D}$ is the distribution of context-encoded
+slow latents over training trajectories. Define also the
+\emph{$K$-step rollout loss}
+\[
+L_K(\Phi) = \mathbb{E}_{z_t \sim \mathcal{D}}
+  \sum_{k=1}^{K} \gamma^{k-1}
+  \bigl\| \Phi^k(z_t) - z_{t+k} \bigr\|^2
+\]
+with $\gamma \in (0,1]$ a discount factor (we used $\gamma{=}0.9$).
+The eval metric (\S\ref{sec:rwm-sprint6b}, \S\ref{sec:rwm-sprint7})
+is precisely $\bigl\| \Phi^{24}(z_t) - z_{t+24} \bigr\|^2$,
+i.e. the $K{=}24$ term of $L_K$ without discount.
+
+\paragraph{The exposure-bias argument.} Optimizing $L_1$ alone
+trains $\Phi$ on inputs sampled from the true data
+distribution $\mathcal{D}$. At rollout time, however, the input
+to $\Phi$ at step $k$ is $\Phi^{k-1}(z_t)$, which lies in a
+distribution $\mathcal{D}_k$ that drifts away from $\mathcal{D}$
+as $k$ increases (Bengio et al., 2015, scheduled sampling). For
+any non-trivial dynamics, $\mathcal{D}_k \neq \mathcal{D}$ for
+$k \geq 2$, and $\Phi$ has no training signal on $\mathcal{D}_k$
+inputs.
+
+The $L_K$ loss explicitly samples $\Phi^{k-1}(z_t)$ as input and
+backpropagates a target through it. This pressures $\Phi$ to be
+accurate on its \emph{own iterated outputs}, not just on the
+training-distribution inputs. The expected $K$-step rollout error
+is bounded as
+\[
+\mathbb{E}\bigl\|\Phi^K(z_t) - z_{t+K}\bigr\|
+  \leq \sum_{k=0}^{K-1} L^k_{\Phi}
+  \cdot \mathbb{E}\bigl\|\Phi(\Phi^k(z_t)) - z_{t+k+1}\bigr\|
+\]
+where $L_{\Phi}$ is the Lipschitz constant of $\Phi$. With
+spectral-normed $\Phi$ ($L_{\Phi} {\leq} 1$, the
+\texttt{stable=True} variant of \S\ref{sec:rwm-rollout-fix}), the
+geometric series is bounded by $K$ times the single-step error
+on the worst-case input distribution along the rollout
+trajectory. Without spectral-norm, the bound blows up
+exponentially --- which we observed empirically in F10
+(\S\ref{sec:rwm-rollout}, $\mathrm{MSE}_{K{=}24} \approx
+4.6{\times}10^9$).
+
+\paragraph{Why this predicts Sprint 7.} The post-hoc reading of
+the four ingredients :
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Multi-step loss ($L_K$ vs $L_1$) is necessary} :
+  $L_1$ alone has no training signal on iterated-input
+  distributions $\mathcal{D}_k$ for $k {\geq} 2$. The model can
+  fit $L_1$ perfectly and still diverge under rollout. The
+  $5{\times}$ degradation we observed on
+  \texttt{no\_multistep} (\S\ref{sec:rwm-sprint7}, $p{<}0.001$)
+  is consistent with this : the exposure-bias term dominates
+  rollout error.
+\item \textbf{Stable transition + Lyap regularization are
+  partially redundant with $L_K$.} Both constrain $\Phi$'s
+  Lipschitz behavior. $L_K$ implicitly does so as well, because
+  $\Phi$ with $L_{\Phi} {>} 1$ produces high-magnitude rollout
+  trajectories that incur large $L_K$ on chaotic regimes.
+  Training under $L_K$ alone is expected to drive $\Phi$ toward
+  contracting behavior even without explicit constraint --- which
+  matches the \texttt{no\_stable} and \texttt{no\_lyap} ablations
+  showing non-significant individual contribution (and slight
+  numerical \emph{improvement} on bull / sideways, consistent
+  with the over-regularization explanation).
+\item \textbf{The \texttt{naive} baseline (no Lyap + no $L_K$)
+  collapses, but neither ablation alone does}. This is the
+  combined-but-not-individual pattern : without $L_K$, the
+  spectral norm + tanh bound are insufficient to keep rollout
+  bounded ; without spectral norm + Lyap, $L_K$ alone can
+  occasionally collapse on chaotic regimes (cf. F11 :
+  $1/8$ seeds fail to train). The two together cover the failure
+  modes the other leaves open.
+\end{enumerate}
+
+\paragraph{Connection to existing literature.} This reading is
+not novel ; it sits cleanly in established sequence-modeling
+folklore : Bengio et al. (2015) scheduled sampling, Hafner et al.
+(2020) DreamerV2 imagination loss, Schmidhuber (1991) world
+models. The contribution of this paper is to add the
+\emph{ablation-grade} evidence on real BTC + ETH that, of the
+common stabilizers added on top of a Markovian one-step
+transition, the multi-step rollout loss carries an order of
+magnitude more empirical weight than spectral-norm or Lyapunov
+regularization in the small-data regime ($\sim 50$ training
+trajectories of length 256). For larger datasets or
+non-autoregressive architectures (Transformers, diffusion), this
+ranking may invert.
+
+\paragraph{What this section does not establish.} (a) Sprint 9
+is post-hoc. We did not pre-register the four-ingredient
+decomposition before Sprint 6B forced the reframe. (b) The
+exposure-bias bound is qualitative ; we do not compute it
+numerically or compare it against the empirical $L_K$
+distribution shift. (c) The non-significance of stable + Lyap
+in Sprint 7 has a confound : per-step descriptor sensing is
+uninterpretable in the K=1 base (M1 footnote of Table
+\ref{tab:sprint7}). A clean factorial ablation would require
+re-running Sprint 7 with K>1 base, which we defer to paper \#2.
+
+\section{What This Paper Does Not Claim}
 \label{sec:not-claim}
 
 To prevent over-reading, we list explicitly what the empirical
