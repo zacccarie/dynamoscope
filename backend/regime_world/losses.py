@@ -96,6 +96,59 @@ def loss_recon(x_recon: torch.Tensor, x_target: torch.Tensor) -> torch.Tensor:
     return ((x_recon - x_target) ** 2).mean()
 
 
+def loss_return_decode(return_pred: torch.Tensor,
+                        return_series: torch.Tensor,
+                        slow_stride: int = 4,
+                        alpha_direction: float = 1.0,
+                        alpha_level: float = 0.1) -> torch.Tensor:
+    """Sprint 8 #1 : return decoder loss combinant direction (BCE sur signe)
+    et level (MSE z-scoré sur amplitude).
+
+    Direction est le signal load-bearing pour Sharpe — un MSE pur fait
+    apprendre la moyenne du drift → constant sign → strategy collapse to
+    'always long'. BCE sur le signe force la direction-explicit prediction.
+
+    Le level est conservé en poids faible (alpha_level=0.1) pour garder
+    l'amplitude calibrée (utile pour crash detection).
+
+    return_pred  : (T_s,) logits du return_head (peut être interprété comme
+                   ± direction signal après tanh)
+    return_series: (T_raw,) log-returns raw step
+    slow_stride  : ratio raw→slow
+    """
+    T_s = return_pred.shape[0]
+    T_raw = return_series.shape[0]
+    S = slow_stride
+    targets = []
+    valid = []
+    for t in range(T_s):
+        lo = (t + 1) * S
+        hi = lo + S
+        if hi <= T_raw:
+            targets.append(return_series[lo:hi].sum())
+            valid.append(t)
+    if len(targets) == 0:
+        return return_pred.sum() * 0.0
+    targets = torch.stack(targets)        # (T_eff,) actual cumul log-return
+    pred = return_pred[valid]              # (T_eff,) logits
+
+    # Direction : BCE(sigmoid(pred), 1[target > median(target)])
+    # Median-threshold pour balance équilibré ~50/50 → empêche collapse
+    # vers une classe majoritaire (cas du drift haussier soutenu).
+    threshold = targets.median().detach()
+    bin_target = (targets > threshold).float()
+    bce = torch.nn.functional.binary_cross_entropy_with_logits(
+        pred, bin_target, reduction="mean")
+
+    # Level : MSE z-scoré (target re-centrée + normalisée à variance unité)
+    targ_z = (targets - targets.mean().detach()) / (
+        targets.std().detach() + 1e-8)
+    pred_z = (pred - pred.mean()) / (pred.std() + 1e-8)
+    mse = ((pred_z - targ_z) ** 2).mean()
+
+    return alpha_direction * bce + alpha_level * mse
+
+
 def loss_dynamics_one_step(z_slow: torch.Tensor, z_slow_pred: torch.Tensor) -> torch.Tensor:
     """Predicted z_t doit approximer z_{t+1} sur z_slow trajectory."""
     if z_slow.shape[0] < 2:

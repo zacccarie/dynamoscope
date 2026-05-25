@@ -2991,11 +2991,122 @@ that the slow-latent has no direct linear correspondence to the
 predicted log-return ; the constructed signal collapses to a
 constant ``long BTC'' policy that yields the same Sharpe on the
 bull-biased 5y period regardless of the model. We removed the
-metric rather than report it. A correct downstream-task evaluation
-would require either (i) a learned decoder from $z^{\text{slow}}$
-back to next-step log-return, then a trading rule on that
-decoded return, or (ii) an explicit return-head trained jointly
-with the world model. Both are deferred.
+metric and added Sprint 8 below to address it properly.
+
+\subsection{Sprint 8 : return decoder + cross-asset transfer (F20 fix attempt)}
+\label{sec:rwm-sprint8}
+
+To address the F20 critique that all RWM rollout MSE is measured
+\emph{in the model's own latent space} and therefore partially
+circular, Sprint 8 adds a small return-decoder head
+($z^{\text{slow}} \!\to\! \mathbb{R}$, 32-hidden MLP) trained
+jointly with the world model. The loss combines BCE on direction
+(median-thresholded for balanced classes : $\mathrm{BCE}(
+\sigma(\hat{r}), \mathbb{1}[r_{\text{target}} > \mathrm{median}])
+$) and z-scored MSE on level. Training data is
+the same BTC + ETH 5y windows as Sprints 6--7. Evaluation is
+\emph{rolling 1-step} : at every slow step $t$, the model produces
+$\hat{r}_t$ from $z^{\text{slow}}_t$ ; we compare to the actual
+cumulative log return over the next slow window, and compute
+Sharpe of a $\pm 1$ position rule.
+
+\textbf{Cross-asset eval.} The trained model (BTC + ETH) is then
+applied without re-training to SPY, QQQ, and GLD daily candles
+(same 5y window, same 5 features computed identically). This
+tests whether the latent dynamics learned on crypto carry
+directional return signal that transfers to equities + commodities.
+
+\begin{table}[h]
+\centering
+\caption{Sprint 8 return-decoder + cross-asset transfer,
+10 seeds. Sharpe of $\mathrm{sign}(\hat{r})$ vs long-only Sharpe ;
+direction accuracy ; crash recall ($P(\hat{r} {<} q_5 \mid
+r_{\text{actual}} {<} \mu {-} 3\sigma)$). Welch's $t$-test
+vs long-only on Sharpe. $n{=}10$ seeds, $n_{\text{steps per yr}}
+{=}63$ (4-day slow window).}
+\label{tab:sprint8}
+\begin{tabular}{lrrrr}
+\toprule
+Domain & Sharpe (model) & Sharpe (long-only) & Dir acc & $p$ vs L-O \\
+\midrule
+\multicolumn{5}{l}{\textit{In-sample (BTC+ETH 20\% held-out)}} \\
+in-sample      & $-0.05 \pm 0.61$ & $+0.18 \pm 0.39$ & $0.50 \pm 0.03$ & $0.35$ ns \\
+\midrule
+\multicolumn{5}{l}{\textit{Cross-asset (equity/commodity, zero-shot)}} \\
+SPY            & $-0.77 \pm 0.06$ & $+0.76 \pm 0.00$ & $0.41 \pm 0.00$ & $<10^{-6}$\textsuperscript{***} \\
+QQQ            & $-0.64 \pm 0.10$ & $+0.61 \pm 0.00$ & $0.46 \pm 0.00$ & $<10^{-6}$\textsuperscript{***} \\
+GLD            & $-1.20 \pm 0.13$ & $+1.25 \pm 0.00$ & $0.47 \pm 0.01$ & $<10^{-6}$\textsuperscript{***} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Three findings, none of them positive.}
+
+(a) \textbf{In-sample : the return decoder learns no directional
+alpha.} Direction accuracy $0.50 \pm 0.03$ (essentially chance).
+Sharpe is statistically indistinguishable from the always-long
+baseline ($p {=} 0.35$ Welch). Per-seed variance is large
+($\pm 0.61$) and signed both ways across seeds, consistent with
+``the model picks an arbitrary constant sign and inherits
+$\pm$ long-only on each held-out split.''
+
+(b) \textbf{Cross-asset : the decoder transfers \emph{anti}-direction.}
+On SPY, QQQ, and GLD, direction accuracy is below chance
+($0.41{-}0.47$), and model Sharpe is the exact mirror of
+long-only Sharpe across all 10 seeds (variance $\le 0.13$,
+identical to 3 decimal places). The model's latent representation
+on equity/commodity OHLCV maps the return-decoder head to a
+single sign output, which happens to be the opposite of the
+asset's bull drift over 2021--2026.
+
+(c) \textbf{Crash recall is above chance but not actionable.}
+Across domains, crash recall is $0.07{-}0.33$ against a
+$5\%$-quantile-of-pred baseline (random would give $\approx
+0.05$). The model captures some tail events but at sample
+sizes that don't support an operational decision rule.
+
+\paragraph{Failure mode F21 (return-decoder cross-asset collapse).}
+The return-decoder head was a deliberate attempt to extract a
+linearly-decodable trading signal from the slow latent. It
+failed : in-sample direction accuracy is $\approx 0.50$, and
+the head outputs a near-constant sign when fed
+out-of-distribution feature distributions (different volatility
+regimes, different return-volume coupling). Two plausible causes :
+(i) the multi-step rollout loss optimizes for trajectory shape
+in feature space, which is dominated by volatility magnitude
+rather than return direction --- so the slow latent encodes
+``how volatile'' but not ``which way'' ; (ii) the BCE direction
+loss interacts with the spectral-normed transition module, which
+contracts the slow latent toward a stable point and erases
+direction-discriminating information.
+
+\paragraph{What this means for the architecture's claim.}
+The Sprint 6B + Sprint 7 reframe stands : \texttt{single\_phi}
+beats HMM, Markov-switching, and a Transformer baseline on
+24-step latent-space rollout MSE by 1--3 orders of magnitude
+with $p {<} 0.001$. But Sprint 8 shows that \emph{the rollout MSE
+does not translate into a directional return signal} : the latent
+dynamics that the model learned do not encode the alpha that a
+trading strategy would need. The two findings are not
+contradictory but they are complementary : the architecture is a
+better \emph{volatility / trajectory shape} model than the
+baselines, and a worse \emph{return direction} model than a
+naive long-only policy. For a downstream-task-driven contribution,
+both pieces matter, and the latter is the harder problem we did
+not solve.
+
+\paragraph{Concrete next steps (paper \#2 territory).}
+\begin{itemize}[leftmargin=*]
+\item Train end-to-end with the return-direction loss as a
+  first-class objective (not added head) so the slow latent is
+  pressured to encode direction.
+\item Inject macro features (rates, VIX, DXY) so the model has
+  exogenous regime information beyond per-asset OHLCV.
+\item Replace the global spectral-norm constraint with
+  regime-conditional scaling --- a constraint that softens during
+  bear regime would preserve directional gradients that the
+  current uniform-stable variant erases.
+\end{itemize}
 \label{sec:not-claim}
 
 To prevent over-reading, we list explicitly what the empirical

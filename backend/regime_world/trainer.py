@@ -38,6 +38,10 @@ class TrainConfig:
     # Sprint 4 #3 : differentiable Lyap regularization (Jacobian sigma_max).
     w_lyap_reg: float = 0.0
     lyap_targets: tuple = (0.9, 1.0, 1.0)  # per-regime σ_max target
+    # Sprint 8 #1 : return decoder loss (predicts next-window log-return).
+    # Requires model.return_head + sample.return_series + slow_stride.
+    w_return_decode: float = 0.0
+    return_slow_stride: int = 4
 
 
 @dataclass
@@ -126,6 +130,15 @@ def train_one_epoch(model, dataset, optim, weights, cfg) -> dict:
             total_loss = loss_dict["total"] + cfg.w_lyap_reg * l_lyap_reg
         else:
             total_loss = loss_dict["total"]
+        # Sprint 8 #1 : optional return-decoder term. Aligns predicted
+        # next-window log-return with actual return_series of the sample.
+        if cfg.w_return_decode > 0 and "return_pred" in out \
+                and hasattr(sample, "return_series"):
+            from .losses import loss_return_decode
+            ret_series = torch.from_numpy(sample.return_series).float().to(device)
+            l_ret = loss_return_decode(out["return_pred"], ret_series,
+                                         slow_stride=cfg.return_slow_stride)
+            total_loss = total_loss + cfg.w_return_decode * l_ret
         optim.zero_grad()
         total_loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

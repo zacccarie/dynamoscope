@@ -479,7 +479,8 @@ class RegimeWorldModel(nn.Module):
                  hybrid_descriptors: bool = False,
                  per_timestep_router: bool = False, router_window: int = 4,
                  continuous_regime: bool = False, n_basis: int = 4,
-                 frozen_router: bool = False):
+                 frozen_router: bool = False,
+                 return_decoder: bool = False, return_dim: int = 1):
         super().__init__()
         self.encoder = PerceptualEncoder(d_in, d_fast)
         self.ssm = FastSlowSSM(d_fast, d_slow, slow_stride)
@@ -532,6 +533,18 @@ class RegimeWorldModel(nn.Module):
             nn.Linear(d_fast, 64), nn.SiLU(),
             nn.Linear(64, d_in),
         )
+        # Sprint 8 #1 : optional return decoder z_slow → predicted log-return
+        # (or any scalar/vector future-state target). Used for downstream
+        # trading-strategy + crash-detection metrics (F20 fix).
+        self.return_decoder_enabled = return_decoder
+        self.return_dim = return_dim
+        if return_decoder:
+            self.return_head = nn.Sequential(
+                nn.Linear(d_slow, 32), nn.SiLU(),
+                nn.Linear(32, return_dim),
+            )
+        else:
+            self.return_head = None
 
     def forward(self, x: torch.Tensor) -> dict:
         """
@@ -570,7 +583,7 @@ class RegimeWorldModel(nn.Module):
             r = uniform
         z_slow_pred = self.dynamics(z_slow, r)     # (T_s, D_slow)
         x_recon = self.decoder(z_fast_enc)         # (T, d_in)
-        return {
+        out = {
             "z_fast": z_fast,
             "z_slow": z_slow,
             "d_dyn": d_dyn,
@@ -578,6 +591,12 @@ class RegimeWorldModel(nn.Module):
             "z_slow_pred": z_slow_pred,
             "x_recon": x_recon,
         }
+        if self.return_head is not None:
+            # Decode return from predicted next slow state (so train-time signal
+            # matches eval-time : we predict z_slow_pred[t], then decode return)
+            out["return_pred"] = self.return_head(z_slow_pred).squeeze(-1)
+            out["return_pred_from_z"] = self.return_head(z_slow).squeeze(-1)
+        return out
 
     def count_params(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -618,8 +637,13 @@ class RegimeWorldModel(nn.Module):
             z_next = self.dynamics(z_per, r).squeeze(0)
             preds.append(z_next)
             z = z_next
-        return {
-            "z_slow_pred": torch.stack(preds),
+        z_slow_pred = torch.stack(preds)
+        out = {
+            "z_slow_pred": z_slow_pred,
             "r": r,
             "z_slow_ctx": z_slow_ctx,
         }
+        if self.return_head is not None:
+            # Decode predicted returns at each rollout step
+            out["return_pred"] = self.return_head(z_slow_pred).squeeze(-1)
+        return out
