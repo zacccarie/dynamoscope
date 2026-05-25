@@ -2458,9 +2458,79 @@ training data (\texttt{mixed\_train}, F14). Stacking
 \texttt{per\_timestep + lyap\_reg} gives a further modest
 improvement, the only stack we tried that did not regress vs
 its components. We do not claim that these gains generalize to
-real action video : the harder bench is procedurally generated and
-the structural advantage may collapse on dynamics that do not
-admit a clean regime decomposition.
+real action video --- and indeed they do not, as we now show.
+
+\subsection{Penn Action : real-video stress test, synth wins do not transfer}
+\label{sec:rwm-penn-action}
+
+We test the Sprint-3 and Sprint-4 winners on Penn Action
+\cite{zhang2013pennaction}, $2326$ real video sequences spanning
+$15$ human action classes with per-frame DINOv2-S features
+(384-d) as input encoder ($d_{\text{in}}{=}384$ instead of $3$,
+slow latent $d_{\text{slow}}{=}64$, total parameters $\sim 133$K).
+We map three Penn Action classes to our taxonomic regimes :
+\texttt{bench\_press} $\to$ smooth (slow controlled motion),
+\texttt{squat} $\to$ periodic (cyclic repetition),
+\texttt{tennis\_serve} $\to$ chaotic (one-shot explosive motion).
+After filtering for videos $\geq 48$ frames (rollout budget at
+$K{=}8$), we obtain 51 sequences --- 16 smooth, 19 periodic, 16
+chaotic. Three seeds, $20$ epochs, $80$/$20$ train/eval split,
+DINOv2 features cached.
+
+\begin{table}[h]
+\centering
+\caption{Penn Action real-video : $K{=}8$ mean rollout MSE per regime.
+3 seeds. \emph{All Welch t-tests vs baseline are not significant.}
+Best per regime in \textbf{bold}.}
+\label{tab:penn-action}
+\begin{tabular}{lrrr}
+\toprule
+Model & smooth (bench\_press) & periodic (squat) & chaotic (tennis\_serve) \\
+\midrule
+\texttt{baseline}     & $\bm{0.067 \pm 0.05}$ & $0.297 \pm 0.1$       & $0.125 \pm 0.06$ \\
+\texttt{per\_timestep}& $0.265 \pm 0.2$       & $0.269 \pm 0.1$       & $0.195 \pm 0.2$ \\
+\texttt{per\_ts\_lyap}& $0.118 \pm 0.01$      & $0.174 \pm 0.04$      & $\bm{0.087 \pm 0.03}$ \\
+\texttt{flat56\_ms}   & $0.105 \pm 0.02$      & $\bm{0.117 \pm 0.02}$ & $0.101 \pm 0.01$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{(F15) Synth-to-real generalization gap : Sprint-3/4 wins
+do not transfer.} Three findings to face honestly :
+
+(a) Not a single Welch t-test reaches $p{<}0.05$ at three seeds. We
+do not have statistical evidence of any architectural advantage on
+Penn Action ; the variance dominates the means.
+
+(b) The within-regime winner \emph{changes} between synth and real :
+\texttt{per\_timestep} won every regime on the harder synth bench
+($\S$\ref{sec:rwm-sprint3}, $p{<}0.05$) but is the \emph{worst} model
+on the smooth (\texttt{bench\_press}) regime here, by a factor of
+$\sim 4{\times}$ vs the baseline. The intuition --- per-step routing
+oscillates more under noisy real signals --- is consistent with the
+real-vs-synth difference but is a post-hoc rationalization.
+
+(c) The flat baseline (\texttt{flat56\_ms}, 182K params) is the
+within-class winner on \texttt{squat} and competitive on the other
+two. At 384-d DINOv2 feature input, the inductive bias of a small
+3-regime mixture is much less helpful : the flat baseline can find
+the relevant structure in the high-dim feature space directly.
+
+\paragraph{What this changes in the paper.} Failure mode \textbf{F15}
+is the most important negative result we have. It tells us that the
+$28{\times}$ Phase 2 headline ($\S$\ref{sec:rwm-video-final}, on
+procedural video) and the matched-capacity Sprint-3 win
+($\S$\ref{sec:rwm-sprint3}, on harder synth) are
+\emph{benchmark-specific}. The regime-aware architecture remains an
+interesting structural idea but it does not show a measurable
+advantage on a real action-video bench at this scale (3 seeds, 60
+sequences, 3 action classes). A defensible empirical claim of
+generalization to real video would require, at minimum :
+(i) $\geq 10$ seeds per configuration ;
+(ii) all 15 Penn Action classes mapped (not 3 hand-picked) ;
+(iii) eval on natural video (Kinetics, Something-Something) where
+the regime taxonomy is even less defensible ;
+(iv) report attractor preservation, not just MSE.
 
 \section{What This Paper Does Not Claim}
 \label{sec:not-claim}
@@ -2638,6 +2708,18 @@ collected here:
   baseline (+44\%). A capacity-matched re-run (6 experts at smaller
   hidden, or 3 experts at larger hidden) is required before this
   number enters the abstract.
+\item \textbf{Synth-to-real generalization gap (F15) : Sprint-3/4
+  wins do not transfer to Penn Action.} On 51 real-video sequences
+  from $3$ Penn Action classes (Sec.~\ref{sec:rwm-penn-action}),
+  no Welch t-test reaches $p{<}0.05$ at three seeds; the
+  \texttt{per\_timestep} Sprint-3 winner is in fact $\sim 4{\times}$
+  \emph{worse} than the baseline on the smooth regime, and the flat
+  baseline is the within-class winner on the periodic regime. The
+  architectural advantage observed on procedural synth video does
+  not show statistically on real action video at this scale. More
+  seeds, more action classes, and a natural-video benchmark
+  (Kinetics, Something-Something) are required for a defensible
+  real-video claim.
 \end{enumerate}
 
 \section{Conclusion}
@@ -2875,6 +2957,11 @@ Representations (ICLR)}.
 Kendall, A., Gal, Y., \& Cipolla, R. (2018). Multi-task learning using
 uncertainty to weigh losses for scene geometry and semantics.
 \emph{Conference on Computer Vision and Pattern Recognition (CVPR)}.
+
+\bibitem{zhang2013pennaction}
+Zhang, W., Zhu, M., \& Derpanis, K. G. (2013). From actemes to action :
+A strongly-supervised representation for detailed action understanding.
+\emph{International Conference on Computer Vision (ICCV)}.
 
 \end{thebibliography}
 
